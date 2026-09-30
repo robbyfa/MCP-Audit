@@ -1,0 +1,13 @@
+version: 1
+
+server:
+  name: mcp-audit
+
+policy:
+  ci:
+    fail_on:
+      - critical
+      - high
+    max_risk_score: 60
+
+suppress: {}

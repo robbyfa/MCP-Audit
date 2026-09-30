@@ -1,0 +1,30 @@
+name: MCP Audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install project and test dependencies
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run pytest
+      - name: Run MCP Audit action smoke test
+        uses: ./
+        with:
+          target: fixtures/safe_server
+          base: HEAD

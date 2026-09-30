@@ -1,0 +1,58 @@
+name: MCP Audit
+description: Scan a Python/FastMCP server for security capability regressions and upload SARIF.
+inputs:
+  target:
+    description: Path to the MCP server source.
+    required: false
+    default: "."
+  base:
+    description: Git revision used as the approved security baseline.
+    required: false
+    default: "origin/main"
+  policy:
+    description: Optional MCP Audit policy file.
+    required: false
+    default: ""
+  sarif:
+    description: SARIF output path.
+    required: false
+    default: "mcp-audit.sarif"
+outputs:
+  exit-code:
+    description: MCP Audit exit code (0 pass, 1 policy failure).
+    value: ${{ steps.audit.outputs.exit-code }}
+runs:
+  using: composite
+  steps:
+    - name: Install MCP Audit
+      shell: bash
+      run: python -m pip install "${{ github.action_path }}"
+    - name: Generate security diff
+      id: audit
+      shell: bash
+      env:
+        MCP_AUDIT_TARGET: ${{ inputs.target }}
+        MCP_AUDIT_BASE: ${{ inputs.base }}
+        MCP_AUDIT_POLICY: ${{ inputs.policy }}
+        MCP_AUDIT_SARIF: ${{ inputs.sarif }}
+      run: |
+        set +e
+        args=(diff "$MCP_AUDIT_TARGET" --base "$MCP_AUDIT_BASE" --format sarif --output "$MCP_AUDIT_SARIF")
+        if [[ -n "$MCP_AUDIT_POLICY" ]]; then
+          args+=(--policy "$MCP_AUDIT_POLICY")
+        fi
+        mcp-audit "${args[@]}"
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [[ $code -eq 2 ]]; then
+          exit 2
+        fi
+        exit 0
+    - name: Upload SARIF
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif }}
+    - name: Enforce policy result
+      if: steps.audit.outputs.exit-code == '1'
+      shell: bash
+      run: exit 1
