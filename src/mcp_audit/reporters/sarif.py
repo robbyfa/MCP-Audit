@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from mcp_audit import RULESET_VERSION, __version__
 from mcp_audit.models.report import ScanReport, SecurityDiff
 
 
@@ -44,8 +45,10 @@ def render_sarif(report: ScanReport | SecurityDiff) -> str:
                 "tool": {
                     "driver": {
                         "name": "MCP Audit",
-                        "informationUri": "https://github.com/mcp-audit/mcp-audit",
+                        "semanticVersion": __version__,
+                        "informationUri": "https://github.com/robbyfa/MCP-Audit",
                         "rules": list(rules.values()),
+                        "properties": {"rulesVersion": RULESET_VERSION},
                     }
                 },
                 "results": results,

@@ -1,0 +1,42 @@
+MCP SECURITY DIFF
+Base: origin/main
+Target: <TMP>/head
+
+Risk
+0 -> 45
+
+New tools
+(none)
+
+Removed tools
+(none)
+
+Changed tools
+~ fetch_status
+
+Capability changes
+~ fetch_status.network: allowlisted_hosts -> unrestricted_outbound
+~ fetch_status.network_destination: https://api.example.com/status -> unrestricted external URL
+
+New findings
++ MCP003 HIGH  fetch_status
++ MCP007 MEDIUM  fetch_status
+
+Resolved findings
+(none)
+
+Regression details
+HIGH MCP016
+Tool: fetch_status
+
+Capability escalation
+A tool capability expanded relative to the Git baseline.
+Location: <TMP>/head/server.py:6
+Evidence:
+  - network: allowlisted_hosts -> unrestricted_outbound
+Risk:
+Existing clients may gain access to broader resources or side effects.
+Suggested remediation:
+Constrain the capability or approve and document the expanded baseline.
+
+Result: FAIL

@@ -9,6 +9,8 @@ MCP Audit uses the same dataclass-backed objects for terminal, JSON, SARIF, mani
 }
 ```
 
+Reports also include the CLI and ruleset versions. Manifests carry `schema_version` and `rules_version`; SARIF uses `semanticVersion` and `properties.rulesVersion` on the tool driver.
+
 `report_type` is either `scan` or `diff`.
 
 ## Finding contract

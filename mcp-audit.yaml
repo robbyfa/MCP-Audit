@@ -10,4 +10,8 @@ policy:
       - high
     max_risk_score: 60
 
-suppress: {}
+suppress:
+  # - rule: MCP003
+  #   tool: internal_fetch
+  #   reason: "Destination is restricted by the service mesh"
+  #   expires: 2027-01-31

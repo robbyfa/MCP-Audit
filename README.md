@@ -15,6 +15,16 @@ uv sync
 Run project commands through `uv run`, or activate the virtual environment with
 `source .venv/bin/activate` before using bare commands.
 
+The package also supports isolated CLI installation directly from a checkout:
+
+```bash
+pipx install .
+mcp-audit --version
+mcp-audit scan .
+```
+
+After the package is published to PyPI, the installation command becomes `pipx install mcp-audit`.
+
 ## Scan a server
 
 ```bash
@@ -76,6 +86,8 @@ steps:
 
 JSON reports and manifests use the versioned schema documented in `docs/report-schema.md`.
 
+The copyable [vulnerable FastMCP demo](examples/vulnerable-fastmcp/) includes four before/after pull-request scenarios and its own Action workflow.
+
 ## V0.1 rules
 
 - `MCP001` arbitrary shell execution.
@@ -87,6 +99,8 @@ JSON reports and manifests use the versioned schema documented in `docs/report-s
 - `MCP010` destructive tool exposed.
 - `MCP016` capability escalation in a diff.
 - `MCP017` approval removed in a diff.
+
+Each rule's detection behavior, examples, remediation, and limitations are documented in [docs/rules](docs/rules/README.md).
 
 ## Demo fixtures
 
@@ -114,9 +128,16 @@ policy:
     max_risk_score: 60
 
 suppress:
-  MCP003:
+  - rule: MCP003
     tool: internal_fetch
     reason: "Network egress is enforced by service mesh"
+    expires: 2027-01-31
 ```
+
+Suppression reasons are required. Expired suppressions no longer hide findings, and `mcp-audit policy check` reports them. See [policy documentation](docs/policy.md).
+
+## Version contracts
+
+CLI, ruleset, report schema, and manifest schema versions evolve independently. See [versioning](docs/versioning.md) and [report schema](docs/report-schema.md).
 
 Passing MCP Audit is technical security evidence, not a legal compliance determination.

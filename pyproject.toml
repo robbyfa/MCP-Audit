@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-audit"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Security regression scanner for Model Context Protocol servers."
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "MCP Audit contributors" }]
+dependencies = [
+  "PyYAML>=6.0,<7",
+]
 keywords = ["mcp", "security", "static-analysis", "sarif", "ci"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -21,6 +24,11 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 
+[project.urls]
+Homepage = "https://github.com/robbyfa/MCP-Audit"
+Repository = "https://github.com/robbyfa/MCP-Audit"
+Issues = "https://github.com/robbyfa/MCP-Audit/issues"
+
 [project.scripts]
 mcp-audit = "mcp_audit.cli.main:main"
 
@@ -31,6 +39,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "mcp_audit.__version__" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

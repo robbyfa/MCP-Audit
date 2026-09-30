@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from mcp_audit import MANIFEST_SCHEMA_VERSION, RULESET_VERSION
 from mcp_audit.models.report import ScanReport
 
 
 def render_manifest(report: ScanReport) -> str:
     lines = [
-        'schema_version: "1.0"',
+        f'schema_version: "{MANIFEST_SCHEMA_VERSION}"',
+        f'rules_version: "{RULESET_VERSION}"',
         "server:",
         f"  name: {report.server_name}",
         "tools:",

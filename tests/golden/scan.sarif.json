@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "fixtures/url_arbitrary/server.py"
+                },
+                "region": {
+                  "snippet": {
+                    "text": "requests.get(url, timeout=5)"
+                  },
+                  "startColumn": 12,
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "A tool-controlled destination reaches an outbound HTTP request without a hostname allowlist.\n\nRisk: The MCP client may reach arbitrary internet, internal, localhost, or metadata endpoints.\n\nRemediation: Parse the URL, require HTTPS, block private ranges, and enforce an explicit hostname allowlist."
+          },
+          "ruleId": "MCP003"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "fixtures/url_arbitrary/server.py"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Security-sensitive parameter 'url' has no detected bounds or allowlist.\n\nRisk: Oversized or unconstrained input increases injection, traversal, and resource-exhaustion risk.\n\nRemediation: Add length, scheme, enum, path-root, or hostname allowlist validation."
+          },
+          "ruleId": "MCP007"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/robbyfa/MCP-Audit",
+          "name": "MCP Audit",
+          "properties": {
+            "rulesVersion": "0.1"
+          },
+          "rules": [
+            {
+              "help": {
+                "text": "Parse the URL, require HTTPS, block private ranges, and enforce an explicit hostname allowlist."
+              },
+              "id": "MCP003",
+              "name": "Arbitrary URL or SSRF surface",
+              "properties": {
+                "security-severity": "8.0"
+              },
+              "shortDescription": {
+                "text": "Arbitrary URL or SSRF surface"
+              }
+            },
+            {
+              "help": {
+                "text": "Add length, scheme, enum, path-root, or hostname allowlist validation."
+              },
+              "id": "MCP007",
+              "name": "Unbounded input",
+              "properties": {
+                "security-severity": "5.0"
+              },
+              "shortDescription": {
+                "text": "Unbounded input"
+              }
+            }
+          ],
+          "semanticVersion": "0.1.0"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from mcp_audit.models.finding import Finding, Severity
 from mcp_audit.models.report import ScanReport, SecurityDiff
 from mcp_audit.policy.loader import Policy
@@ -11,7 +13,10 @@ def apply_policy(
     report.findings = [
         finding
         for finding in report.findings
-        if (finding.rule_id, finding.tool) not in policy.suppressions and (finding.rule_id, None) not in policy.suppressions
+        if not any(
+            suppression.matches(finding) and suppression.is_active(date.today())
+            for suppression in policy.suppressions
+        )
     ]
     thresholds = (
         {severity for severity in Severity if severity >= fail_on}

@@ -170,6 +170,9 @@ class FunctionAnalyzer(ast.NodeVisitor):
             if call_name == "os.system" or _keyword_is_true(node, "shell"):
                 self.shell_execution = True
                 self._record(node, f"{call_name}(...) invokes a command through a shell.", "execution")
+            elif call_name.startswith("subprocess.") and _has_model_controlled_executable(node, self._parameter_roots):
+                self.shell_execution = True
+                self._record(node, f"{call_name}(...) uses a model-controlled executable or interpreter payload.", "execution")
         if call_name in {"open", "read_text", "read_bytes", "Path.open", "Path.read_text", "Path.read_bytes"} or call_name.endswith((".read_text", ".read_bytes")):
             self.filesystem_read = True
             self.filesystem_operation_lines.append(node.lineno)
@@ -289,6 +292,21 @@ def _keyword_is_true(node: ast.Call, name: str) -> bool:
 
 def _keyword_value(node: ast.Call, name: str) -> ast.AST | None:
     return next((keyword.value for keyword in node.keywords if keyword.arg == name), None)
+
+
+def _has_model_controlled_executable(node: ast.Call, roots_for) -> bool:
+    if not node.args:
+        return False
+    command = node.args[0]
+    roots = roots_for(command)
+    if not roots:
+        return False
+    if isinstance(command, (ast.List, ast.Tuple)) and command.elts:
+        executable = command.elts[0]
+        if isinstance(executable, ast.Constant) and isinstance(executable.value, str):
+            return executable.value in {"bash", "sh", "zsh", "cmd", "powershell", "pwsh", "python", "python3"}
+        return bool(roots_for(executable))
+    return True
 
 
 def _requires_approval(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:

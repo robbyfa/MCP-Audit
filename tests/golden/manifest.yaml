@@ -1,0 +1,14 @@
+schema_version: "1.0"
+rules_version: "0.1"
+server:
+  name: safe_server
+tools:
+  read_report:
+    source: <ROOT>/fixtures/safe_server/server.py:11
+    data_access: [pii]
+    side_effect: none
+    filesystem: allowlisted_files
+    network: none
+    network_destination: none
+    execution: none
+    requires_approval: false

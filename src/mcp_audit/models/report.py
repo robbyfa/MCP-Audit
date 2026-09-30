@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from mcp_audit import REPORT_SCHEMA_VERSION, RULESET_VERSION, __version__
 from mcp_audit.models.capability import Tool
 from mcp_audit.models.finding import Finding, Severity
 
@@ -32,8 +33,9 @@ class ScanReport:
 
     def as_dict(self) -> dict[str, object]:
         return {
-            "schema_version": "1.0",
+            "schema_version": REPORT_SCHEMA_VERSION,
             "report_type": "scan",
+            "versions": {"cli": __version__, "rules": RULESET_VERSION},
             "target": self.target,
             "server": {"name": self.server_name},
             "summary": {
@@ -93,8 +95,9 @@ class SecurityDiff:
 
     def as_dict(self) -> dict[str, object]:
         return {
-            "schema_version": "1.0",
+            "schema_version": REPORT_SCHEMA_VERSION,
             "report_type": "diff",
+            "versions": {"cli": __version__, "rules": RULESET_VERSION},
             "target": self.target,
             "base": self.base,
             "server": {"name": self.server_name},

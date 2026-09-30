@@ -94,7 +94,7 @@ def _capability_changes(base_tools: dict[str, Tool], head_tools: dict[str, Tool]
     for name in sorted(base_tools.keys() & head_tools.keys()):
         before = base_tools[name].capability.as_dict()
         after = head_tools[name].capability.as_dict()
-        for capability in before.keys() | after.keys():
+        for capability in sorted(before.keys() | after.keys()):
             if before.get(capability) != after.get(capability):
                 changes.append(CapabilityChange(name, capability, before.get(capability), after.get(capability)))
     return changes

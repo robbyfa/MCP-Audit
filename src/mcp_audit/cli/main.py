@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from mcp_audit import __version__
 from mcp_audit.analysis.diff import diff_against_base
 from mcp_audit.analysis.scan import scan_path
 from mcp_audit.models.finding import Severity
@@ -38,7 +39,16 @@ def main(argv: list[str] | None = None) -> int:
             _write(_render(report, args.format), args.output)
             return 1 if report.result == "fail" else 0
         if args.command == "policy" and args.policy_command == "check":
-            load_policy(args.policy)
+            policy = load_policy(args.policy)
+            expired = policy.expired_suppressions()
+            if expired:
+                for suppression in expired:
+                    print(
+                        f"Expired suppression: {suppression.rule_id} "
+                        f"({suppression.tool or 'all tools'}) expired {suppression.expires}",
+                        file=sys.stderr,
+                    )
+                return 1
             print(f"Policy OK: {args.policy}")
             return 0
     except Exception as exc:
@@ -50,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="mcp-audit", description="Security regression scanner for MCP servers.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command")
 
     scan = subcommands.add_parser("scan", help="scan local source")

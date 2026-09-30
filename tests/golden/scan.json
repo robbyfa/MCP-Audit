@@ -1,0 +1,80 @@
+{
+  "findings": [],
+  "report_type": "scan",
+  "schema_version": "1.0",
+  "server": {
+    "name": "url_allowlisted"
+  },
+  "summary": {
+    "findings": 0,
+    "result": "pass",
+    "risk_score": 0,
+    "severity_counts": {
+      "critical": 0,
+      "high": 0,
+      "low": 0,
+      "medium": 0
+    },
+    "tools": 1
+  },
+  "target": "<ROOT>/fixtures/url_allowlisted",
+  "tools": [
+    {
+      "capabilities": {
+        "audit_metadata": false,
+        "data_access": [],
+        "destructive": false,
+        "execution": "none",
+        "filesystem": "none",
+        "financial": false,
+        "network": "allowlisted_hosts",
+        "network_destination": "unrestricted external URL",
+        "requires_approval": false,
+        "sensitivity": "public",
+        "side_effect": "none"
+      },
+      "context": "server.py:mcp",
+      "description": "",
+      "evidence": [
+        {
+          "kind": "network_guard",
+          "location": {
+            "column": 8,
+            "end_column": 50,
+            "end_line": 12,
+            "line": 12,
+            "path": "<ROOT>/fixtures/url_allowlisted/server.py"
+          },
+          "message": "Destination hostname is checked against an explicit allowlist.",
+          "snippet": "parsed.hostname not in {\"api.example.com\"}"
+        },
+        {
+          "kind": "network",
+          "location": {
+            "column": 12,
+            "end_column": 40,
+            "end_line": 14,
+            "line": 14,
+            "path": "<ROOT>/fixtures/url_allowlisted/server.py"
+          },
+          "message": "Tool input url flows into requests.get(...).",
+          "snippet": "requests.get(url, timeout=5)"
+        }
+      ],
+      "name": "fetch_api",
+      "parameters": [
+        {
+          "annotation": "str",
+          "bounded": true,
+          "default": null,
+          "name": "url"
+        }
+      ],
+      "source": "<ROOT>/fixtures/url_allowlisted/server.py:10"
+    }
+  ],
+  "versions": {
+    "cli": "0.1.0",
+    "rules": "0.1"
+  }
+}

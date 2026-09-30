@@ -1,0 +1,41 @@
+MCP AUDIT
+Server: url_arbitrary
+Target: <ROOT>/fixtures/url_arbitrary
+
+Tools discovered: 1
+
+Risk findings
+CRITICAL  0
+HIGH      1
+MEDIUM    1
+LOW       0
+Risk score: 45
+
+HIGH MCP003
+Tool: fetch_url
+
+Arbitrary URL or SSRF surface
+A tool-controlled destination reaches an outbound HTTP request without a hostname allowlist.
+Location: <ROOT>/fixtures/url_arbitrary/server.py:9
+Evidence:
+  - Tool input url flows into requests.get(...).
+    requests.get(url, timeout=5)
+Risk:
+The MCP client may reach arbitrary internet, internal, localhost, or metadata endpoints.
+Suggested remediation:
+Parse the URL, require HTTPS, block private ranges, and enforce an explicit hostname allowlist.
+
+MEDIUM MCP007
+Tool: fetch_url
+
+Unbounded input
+Security-sensitive parameter 'url' has no detected bounds or allowlist.
+Location: <ROOT>/fixtures/url_arbitrary/server.py:8
+Evidence:
+  - Parameter type: str
+Risk:
+Oversized or unconstrained input increases injection, traversal, and resource-exhaustion risk.
+Suggested remediation:
+Add length, scheme, enum, path-root, or hostname allowlist validation.
+
+Result: FAIL

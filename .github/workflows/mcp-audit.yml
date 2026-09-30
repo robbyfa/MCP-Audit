@@ -24,6 +24,8 @@ jobs:
         run: uv sync --locked
       - name: Run tests
         run: uv run pytest
+      - name: Build release artifacts
+        run: uv build
       - name: Run MCP Audit action smoke test
         uses: ./
         with:

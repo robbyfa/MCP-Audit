@@ -1,0 +1,14 @@
+# Rule precision matrix
+
+The release gate requires positive, negative, guarded, and edge coverage for the differentiating rules.
+
+| Rule | True positive | True negative | Guarded safe | Tricky edge |
+| --- | --- | --- | --- | --- |
+| MCP001 | `shell_direct` | `safe_server` | `shell_safe_allowlist` | `shell_dynamic_no_shell` detects a dynamic executable without `shell=True` |
+| MCP002 | `filesystem_unrestricted` | `sensitive_read_only` | `filesystem_restricted` | `filesystem_guard_after_read` rejects a late guard |
+| MCP003 | `url_arbitrary` | fixed URL in demo baseline | `url_allowlisted` | hostname mention and guard-after-request remain findings |
+| MCP005 | `sensitive_to_network` | `sensitive_read_only` | constrained source-only server | root corpus proves independent MCP contexts are isolated |
+| MCP016 | network expansion diff | unchanged diff | allowlist-added demo resolves risk | a new high-impact tool is an escalation |
+| MCP017 | approval-removed diff | preserved approval | approval-added demo resolves risk | capability field change is retained in machine output |
+
+MCP004, MCP007, and MCP010 also have paired approved/bounded and unapproved/unbounded fixtures. The matrix is intentionally tied to fixture and test names so reviewers can audit the claim.

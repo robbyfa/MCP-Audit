@@ -18,7 +18,9 @@ def rule_ids(fixture: str) -> set[str]:
     ("fixture", "rule_id"),
     [
         ("shell_direct", "MCP001"),
+        ("shell_dynamic_no_shell", "MCP001"),
         ("filesystem_unrestricted", "MCP002"),
+        ("filesystem_guard_after_read", "MCP002"),
         ("url_arbitrary", "MCP003"),
         ("url_hostname_unguarded", "MCP003"),
         ("url_guard_after_request", "MCP003"),
@@ -56,6 +58,10 @@ def test_hostname_mention_without_rejecting_allowlist_is_not_a_guard() -> None:
 
 def test_allowlist_after_request_does_not_bound_the_sink_input() -> None:
     assert {"MCP003", "MCP007"}.issubset(rule_ids("url_guard_after_request"))
+
+
+def test_path_guard_after_read_does_not_bound_the_path() -> None:
+    assert {"MCP002", "MCP007"}.issubset(rule_ids("filesystem_guard_after_read"))
 
 
 def test_mcp005_reports_classification_destination_and_path() -> None:
