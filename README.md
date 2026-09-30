@@ -56,6 +56,7 @@ The repository includes a composite action that runs the security diff, uploads 
 
 ```yaml
 permissions:
+  actions: read
   contents: read
   security-events: write
 
