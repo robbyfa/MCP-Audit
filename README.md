@@ -10,19 +10,19 @@ MCP Audit tells you when a pull request makes an MCP server more dangerous.
 
 Filesystem scope widened from allowlisted to unrestricted.
 
-![MCP Audit blocking an unrestricted filesystem regression](docs/assets/demo/blocking-regression.png)
+![MCP Audit blocking an unrestricted filesystem regression](https://raw.githubusercontent.com/robbyfa/MCP-Audit/v0.2.3/docs/assets/demo/blocking-regression.png)
 
 **No security regression**
 
 A new read-only tool was added; MCP Audit warns but does not block.
 
-![MCP Audit allowing a harmless read-only tool](docs/assets/demo/harmless-tool-added.png)
+![MCP Audit allowing a harmless read-only tool](https://raw.githubusercontent.com/robbyfa/MCP-Audit/v0.2.3/docs/assets/demo/harmless-tool-added.png)
 
 **Security improvement**
 
 Filesystem access was narrowed and previous findings were resolved.
 
-![MCP Audit reporting resolved filesystem findings](docs/assets/demo/security-improvement.png)
+![MCP Audit reporting resolved filesystem findings](https://raw.githubusercontent.com/robbyfa/MCP-Audit/v0.2.3/docs/assets/demo/security-improvement.png)
 
 Add it to a pull-request workflow:
 
@@ -41,7 +41,7 @@ steps:
     with:
       python-version: "3.12"
 
-  - uses: robbyfa/MCP-Audit@v0.2.2
+  - uses: robbyfa/MCP-Audit@v0.2.3
     with:
       path: .
       baseline: origin/main
@@ -148,7 +148,7 @@ steps:
   - uses: actions/setup-python@v5
     with:
       python-version: "3.12"
-  - uses: robbyfa/MCP-Audit@v0.2.2
+  - uses: robbyfa/MCP-Audit@v0.2.3
     with:
       path: .
       baseline: origin/main

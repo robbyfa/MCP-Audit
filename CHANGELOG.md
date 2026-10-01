@@ -4,6 +4,18 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-01
+
+### Fixed
+
+- Use absolute, tag-pinned image URLs so PyPI renders the README demo screenshots.
+- Refresh the three README assets with the final v0.2.2 Action summaries.
+
+### Verified
+
+- 91 automated tests and an isolated wheel installation.
+- README image URLs point to assets contained in the matching Git tag.
+
 ## [0.2.2] - 2026-10-01
 
 ### Changed
