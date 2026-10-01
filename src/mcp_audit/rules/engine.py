@@ -65,7 +65,7 @@ def _tool_findings(tool: Tool) -> list[Finding]:
             )
         )
     if capability.side_effect in {"external_write", "destructive_action"} and not capability.requires_approval:
-        evidence = _evidence(tool, {"network", "approval"}) or tool.evidence
+        evidence = _evidence(tool, {"network", "approval", "side_effect", "destructive"}) or tool.evidence
         findings.append(
             Finding(
                 rule_id="MCP004",
@@ -95,6 +95,7 @@ def _tool_findings(tool: Tool) -> list[Finding]:
                 )
             )
     if capability.destructive and not capability.requires_approval:
+        evidence = _evidence(tool, {"destructive"})
         findings.append(
             Finding(
                 rule_id="MCP010",
@@ -105,7 +106,7 @@ def _tool_findings(tool: Tool) -> list[Finding]:
                 impact="A mistaken or malicious invocation could irreversibly delete or revoke data or access.",
                 recommendation="Require human approval and scoped authorization for destructive tools.",
                 location=_location(tool),
-                evidence=[Evidence(message="Tool semantics indicate a destructive action.", kind="capability")],
+                evidence=evidence or [Evidence(message="Tool semantics indicate a destructive action.", kind="capability")],
             )
         )
     return findings
@@ -125,7 +126,7 @@ def _cross_tool_findings(tools: list[Tool]) -> list[Finding]:
                 continue
             unrestricted = sink.capability.network == "unrestricted_outbound"
             data_classes = sorted(source.capability.data_access)
-            sink_evidence = _evidence(sink, {"network"})
+            sink_evidence = _evidence(sink, {"network", "side_effect"})
             findings.append(
                 Finding(
                     rule_id="MCP005",

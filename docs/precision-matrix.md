@@ -12,3 +12,5 @@ The release gate requires positive, negative, guarded, and edge coverage for the
 | MCP017 | approval-removed diff | preserved approval | approval-added demo resolves risk | capability field change is retained in machine output |
 
 MCP004, MCP007, and MCP010 also have paired approved/bounded and unapproved/unbounded fixtures. The matrix is intentionally tied to fixture and test names so reviewers can audit the claim.
+
+`postgresql_read_only` protects the semantic classifier from matching `post` inside `PostgreSQL`; `sql_destructive` proves that actual `DELETE`/`DROP` semantics still produce MCP004 and MCP010 with relevant evidence.

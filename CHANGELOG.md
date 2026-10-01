@@ -4,6 +4,11 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent `PostgreSQL` from being misclassified as an HTTP `POST` side effect.
+- Attach destructive semantic evidence to MCP004 and MCP010 instead of unrelated database-read evidence.
+
 ## [0.1.0] - 2026-09-30
 
 ### Added

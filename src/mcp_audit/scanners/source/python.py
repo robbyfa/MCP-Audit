@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 from mcp_audit.models.capability import Capability, Parameter, Tool
@@ -103,9 +104,23 @@ def _tool_from_function(
             capability.side_effect = "external_write"
     if _looks_external_write(lower_text):
         capability.side_effect = "external_write"
+        analyzer.evidence.append(
+            Evidence(
+                message="Tool name or description indicates an external write.",
+                kind="side_effect",
+                location=_function_location(file_path, node),
+            )
+        )
     if _looks_destructive(lower_text):
         capability.destructive = True
         capability.side_effect = "destructive_action"
+        analyzer.evidence.append(
+            Evidence(
+                message="Tool name or description indicates a destructive action.",
+                kind="destructive",
+                location=_function_location(file_path, node),
+            )
+        )
     if "financial" in data_classes:
         capability.financial = True
         capability.data_access.add("financial")
@@ -367,6 +382,20 @@ def _data_classes(text: str) -> set[str]:
     return {classification for classification, tokens in SENSITIVE_TOKENS.items() if any(token in text for token in tokens)}
 
 
+def _function_location(file_path: Path, node: ast.FunctionDef | ast.AsyncFunctionDef) -> Location:
+    return Location(
+        path=str(file_path),
+        line=node.lineno,
+        column=node.col_offset + 1,
+        end_line=node.end_lineno,
+        end_column=(node.end_col_offset + 1) if node.end_col_offset is not None else None,
+    )
+
+
+def _semantic_tokens(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
 def _highest_sensitivity(data_classes: set[str]) -> str:
     for value in ("secret", "pii", "financial", "confidential", "internal"):
         if value in data_classes:
@@ -375,8 +404,8 @@ def _highest_sensitivity(data_classes: set[str]) -> str:
 
 
 def _looks_external_write(text: str) -> bool:
-    return any(token in text for token in {"send", "email", "slack", "webhook", "publish", "post", "message"})
+    return bool(_semantic_tokens(text) & {"send", "email", "slack", "webhook", "publish", "post", "message"})
 
 
 def _looks_destructive(text: str) -> bool:
-    return any(token in text for token in {"delete", "drop", "remove", "revoke", "terminate", "destroy"})
+    return bool(_semantic_tokens(text) & {"delete", "drop", "remove", "revoke", "terminate", "destroy"})

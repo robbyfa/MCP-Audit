@@ -94,3 +94,18 @@ def test_network_finding_contains_precise_code_evidence() -> None:
     assert evidence.snippet == "requests.get(url, timeout=5)"
     assert finding.impact
     assert finding.recommendation
+
+
+def test_postgresql_name_does_not_imply_http_post_or_external_write() -> None:
+    report = scan_path(ROOT / "fixtures/postgresql_read_only")
+    assert "MCP004" not in {finding.rule_id for finding in report.findings}
+    assert "MCP005" not in {finding.rule_id for finding in report.findings}
+    assert all(tool.capability.side_effect == "none" for tool in report.tools)
+
+
+def test_destructive_sql_uses_semantic_evidence_not_database_read_evidence() -> None:
+    report = scan_path(ROOT / "fixtures/sql_destructive")
+    findings = [finding for finding in report.findings if finding.rule_id in {"MCP004", "MCP010"}]
+    assert {finding.rule_id for finding in findings} == {"MCP004", "MCP010"}
+    assert all(finding.evidence for finding in findings)
+    assert all(finding.evidence[0].kind == "destructive" for finding in findings)
