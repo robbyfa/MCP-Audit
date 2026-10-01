@@ -41,7 +41,7 @@ steps:
     with:
       python-version: "3.12"
 
-  - uses: robbyfa/MCP-Audit@v0.2.0
+  - uses: robbyfa/MCP-Audit@v0.2.1
     with:
       path: .
       baseline: origin/main
@@ -148,7 +148,7 @@ steps:
   - uses: actions/setup-python@v5
     with:
       python-version: "3.12"
-  - uses: robbyfa/MCP-Audit@v0.2.0
+  - uses: robbyfa/MCP-Audit@v0.2.1
     with:
       path: .
       baseline: origin/main

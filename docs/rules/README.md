@@ -1,6 +1,6 @@
 # MCP Audit rules
 
-Rules are versioned independently from the CLI. MCP Audit `0.2.0` ships ruleset `0.2`.
+Rules are versioned independently from the CLI. MCP Audit `0.2.1` ships ruleset `0.2`.
 
 | Rule | Default severity | Purpose |
 | --- | --- | --- |

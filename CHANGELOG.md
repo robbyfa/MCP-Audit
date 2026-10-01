@@ -4,6 +4,23 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-01
+
+### Changed
+
+- Make GitHub job summaries immediately scannable with distinct regression, warning-only, and clean status labels.
+- Present improvements and resolved findings in the same structured table format as regressions.
+- Lead the README with three public pull-request examples that demonstrate blocking, warning-only, and improving changes.
+
+### Fixed
+
+- Suppress the internal Action smoke-test summary so pull requests show one user-facing MCP Audit summary.
+- Give the public check the descriptive name `MCP Security Regression Check`.
+
+### Verified
+
+- 91 automated tests, including explicit Markdown contracts for blocking regressions, warning-only changes, and improvements.
+
 ## [0.2.0] - 2026-10-01
 
 ### Added
