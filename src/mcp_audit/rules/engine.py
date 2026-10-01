@@ -115,11 +115,7 @@ def _tool_findings(tool: Tool) -> list[Finding]:
 def _cross_tool_findings(tools: list[Tool]) -> list[Finding]:
     findings: list[Finding] = []
     sensitive_sources = [tool for tool in tools if tool.capability.data_access and tool.capability.sensitivity != "public"]
-    external_sinks = [
-        tool
-        for tool in tools
-        if tool.capability.network == "unrestricted_outbound" or tool.capability.side_effect in {"external_write", "public_action"}
-    ]
+    external_sinks = [tool for tool in tools if _has_external_destination(tool)]
     for source in sensitive_sources:
         for sink in external_sinks:
             if source.name == sink.name or source.context != sink.context:
@@ -152,10 +148,15 @@ def _cross_tool_findings(tools: list[Tool]) -> list[Finding]:
                     ],
                     path=[source.name, "agent_context", sink.name],
                     data_classification=data_classes,
-                    destination=sink.capability.network_destination or sink.capability.network,
+                    destination=sink.capability.network_destination,
                 )
             )
     return findings
+
+
+def _has_external_destination(tool: Tool) -> bool:
+    destination = tool.capability.network_destination
+    return tool.capability.network != "none" and bool(destination and destination != "none")
 
 
 def _evidence(tool: Tool, kinds: set[str]) -> list[Evidence]:

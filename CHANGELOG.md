@@ -4,6 +4,22 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-01
+
+### Fixed
+
+- Discover tools registered with `mcp.tool()(function)`, including functions imported from scanned project modules; unresolved static registrations now fail closed.
+- Require a concrete outbound network destination before MCP005 can classify a tool as an exfiltration sink.
+- Propagate approved-root guarantees from path-validation helpers such as `_resolve(path)` to later filesystem operations.
+- Classify `open(..., "w")`, directory creation, and local filesystem mutations as local writes instead of reads or external writes.
+
+### Verified
+
+- `python-fastmcp-server`: 3 programmatically registered tools discovered instead of a zero-tool result.
+- `sqlite-explorer-fastmcp-mcp-server`: 3 read-only tools, 0 side-effect or MCP005 findings.
+- `obsidian-mcp`: helper-scoped filesystem tools recognized as allowlisted; only 3 findings remain.
+- `smart_terminal_mcp`: critical execution findings preserved, write-mode evidence corrected, and no MCP005 paths remain.
+
 ## [0.1.1] - 2026-10-01
 
 ### Added

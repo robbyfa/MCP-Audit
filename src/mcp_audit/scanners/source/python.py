@@ -25,25 +25,76 @@ NETWORK_WRITES = {
     "httpx.post", "httpx.put", "httpx.patch", "httpx.delete",
 }
 
+type FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+type SourceUnit = tuple[str, ast.Module, str, set[str], dict[str, FunctionNode]]
+
 
 def scan_python_sources(root: Path) -> list[Tool]:
     files = _python_files(root)
-    tools: list[Tool] = []
+    units: dict[Path, SourceUnit] = {}
+    module_index: dict[str, Path] = {}
+
     for file_path in files:
-        try:
-            source_text = file_path.read_text(encoding="utf-8")
-            tree = ast.parse(source_text, filename=str(file_path))
-        except SyntaxError as exc:
-            raise ValueError(f"cannot parse Python source {file_path}:{exc.lineno}: {exc.msg}") from exc
-        except UnicodeDecodeError as exc:
-            raise ValueError(f"Python source is not UTF-8: {file_path}") from exc
-        except OSError as exc:
-            raise OSError(exc.errno, f"cannot read Python source {file_path}: {exc.strerror}", str(file_path)) from exc
+        source_text, tree = _parse_source(file_path)
         context_path = file_path.name if root.is_file() else str(file_path.relative_to(root))
-        visitor = FastMCPVisitor(file_path, source_text, context_path)
+        functions = {
+            node.name: node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        units[file_path] = (source_text, tree, context_path, _path_guard_helpers(tree), functions)
+        for module_name in _module_names(root, file_path):
+            module_index[module_name] = file_path
+
+    tools: list[Tool] = []
+    for file_path, (source_text, tree, context_path, path_helpers, _) in units.items():
+        visitor = FastMCPVisitor(file_path, source_text, context_path, path_helpers)
         visitor.visit(tree)
         tools.extend(visitor.tools)
-    return tools
+
+    for file_path, unit in units.items():
+        source_text, tree, context_path, _, _ = unit
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            registration = _tool_registration(node)
+            if registration is None:
+                continue
+            decorator, target = registration
+            resolved = _resolve_registered_function(target, file_path, units, module_index, root)
+            if resolved is None:
+                snippet = ast.get_source_segment(source_text, node) or ast.unparse(node)
+                raise ValueError(f"cannot resolve registered MCP tool in {file_path}:{node.lineno}: {snippet}")
+            target_file, function = resolved
+            target_source, _, target_context, target_helpers, _ = units[target_file]
+            tools.append(
+                _tool_from_function(
+                    target_file,
+                    target_source,
+                    target_context,
+                    function,
+                    path_helpers=target_helpers,
+                    registered_decorator=decorator,
+                    registered_context=_registered_tool_context(context_path, decorator),
+                )
+            )
+
+    unique: dict[tuple[str, str, str], Tool] = {}
+    for tool in tools:
+        unique[(tool.source, tool.context, tool.name)] = tool
+    return list(unique.values())
+
+
+def _parse_source(file_path: Path) -> tuple[str, ast.Module]:
+    try:
+        source_text = file_path.read_text(encoding="utf-8")
+        return source_text, ast.parse(source_text, filename=str(file_path))
+    except SyntaxError as exc:
+        raise ValueError(f"cannot parse Python source {file_path}:{exc.lineno}: {exc.msg}") from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"Python source is not UTF-8: {file_path}") from exc
+    except OSError as exc:
+        raise OSError(exc.errno, f"cannot read Python source {file_path}: {exc.strerror}", str(file_path)) from exc
 
 
 def _python_files(root: Path) -> list[Path]:
@@ -73,16 +124,138 @@ def _python_files(root: Path) -> list[Path]:
     return sorted(files)
 
 
+def _module_names(root: Path, file_path: Path) -> set[str]:
+    relative = Path(file_path.name) if root.is_file() else file_path.relative_to(root)
+    parts = list(relative.with_suffix("").parts)
+    if parts and parts[-1] == "__init__":
+        parts.pop()
+    if not parts:
+        return set()
+    names = {".".join(parts)}
+    if parts[0] in {"src", "lib"} and len(parts) > 1:
+        names.add(".".join(parts[1:]))
+    return names
+
+
+def _tool_registration(node: ast.Call) -> tuple[ast.Call, ast.AST] | None:
+    if not isinstance(node.func, ast.Call) or not node.args:
+        return None
+    decorator = node.func
+    target = decorator.func
+    if isinstance(target, ast.Attribute) and target.attr == "tool":
+        return decorator, node.args[0]
+    if isinstance(target, ast.Name) and target.id in {"tool", "mcp_tool"}:
+        return decorator, node.args[0]
+    return None
+
+
+def _resolve_registered_function(
+    target: ast.AST,
+    registration_file: Path,
+    units: dict[Path, SourceUnit],
+    module_index: dict[str, Path],
+    root: Path,
+) -> tuple[Path, FunctionNode] | None:
+    _, tree, _, _, local_functions = units[registration_file]
+    if isinstance(target, ast.Name) and target.id in local_functions:
+        return registration_file, local_functions[target.id]
+
+    current_modules = _module_names(root, registration_file)
+    current_module = min(current_modules, key=lambda value: (value.count("."), len(value)), default="")
+    imported_functions: dict[str, tuple[str, str]] = {}
+    module_aliases: dict[str, str] = {}
+    for statement in tree.body:
+        if isinstance(statement, ast.ImportFrom):
+            module_name = _absolute_import_module(current_module, statement.module, statement.level)
+            for alias in statement.names:
+                imported_functions[alias.asname or alias.name] = (module_name, alias.name)
+        elif isinstance(statement, ast.Import):
+            for alias in statement.names:
+                module_aliases[alias.asname or alias.name.split(".")[0]] = alias.name
+
+    module_name = ""
+    function_name = ""
+    if isinstance(target, ast.Name) and target.id in imported_functions:
+        module_name, function_name = imported_functions[target.id]
+    elif isinstance(target, ast.Attribute):
+        qualified = _call_name(target)
+        if "." in qualified:
+            owner, function_name = qualified.rsplit(".", 1)
+            module_name = module_aliases.get(owner, owner)
+    if not module_name or not function_name:
+        return None
+    target_file = module_index.get(module_name)
+    if target_file is None:
+        suffix_matches = {
+            path
+            for indexed_name, path in module_index.items()
+            if indexed_name.endswith(f".{module_name}")
+        }
+        if len(suffix_matches) == 1:
+            target_file = suffix_matches.pop()
+    if target_file is None:
+        return None
+    function = units[target_file][4].get(function_name)
+    return (target_file, function) if function is not None else None
+
+
+def _absolute_import_module(current_module: str, imported_module: str | None, level: int) -> str:
+    if level == 0:
+        return imported_module or ""
+    package = current_module.split(".")[:-1]
+    keep = max(0, len(package) - (level - 1))
+    prefix = package[:keep]
+    if imported_module:
+        prefix.extend(imported_module.split("."))
+    return ".".join(prefix)
+
+
+def _registered_tool_context(context_path: str, decorator: ast.Call) -> str:
+    target = decorator.func
+    if isinstance(target, ast.Attribute) and target.attr == "tool":
+        owner = _call_name(target.value) or "mcp"
+        return f"{context_path}:{owner}"
+    return context_path
+
+
+def _path_guard_helpers(tree: ast.Module) -> set[str]:
+    helpers: set[str] = set()
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        text = ast.unparse(node).lower()
+        has_resolution = any(token in text for token in {".resolve(", "realpath(", "abspath("})
+        has_boundary_check = any(token in text for token in {"relative_to(", "is_relative_to("}) or (
+            ".startswith(" in text
+            and any(token in text for token in {"root", "vault", "base", "directory", "workspace", "allowed"})
+        )
+        has_rejection = any(isinstance(child, ast.Raise) for child in ast.walk(node)) or any(
+            token in text for token in {"outside allowed", "path_violation", "path escapes", "return none"}
+        )
+        if has_resolution and has_boundary_check and has_rejection:
+            helpers.add(node.name)
+    return helpers
+
+
 class FastMCPVisitor(ast.NodeVisitor):
-    def __init__(self, file_path: Path, source_text: str, context_path: str) -> None:
+    def __init__(self, file_path: Path, source_text: str, context_path: str, path_helpers: set[str]) -> None:
         self.file_path = file_path
         self.source_text = source_text
         self.context_path = context_path
+        self.path_helpers = path_helpers
         self.tools: list[Tool] = []
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if _is_tool_function(node):
-            self.tools.append(_tool_from_function(self.file_path, self.source_text, self.context_path, node))
+            self.tools.append(
+                _tool_from_function(
+                    self.file_path,
+                    self.source_text,
+                    self.context_path,
+                    node,
+                    path_helpers=self.path_helpers,
+                )
+            )
         self.generic_visit(node)
 
     visit_AsyncFunctionDef = visit_FunctionDef
@@ -103,11 +276,15 @@ def _tool_from_function(
     source_text: str,
     context_path: str,
     node: ast.FunctionDef | ast.AsyncFunctionDef,
+    *,
+    path_helpers: set[str] | None = None,
+    registered_decorator: ast.Call | None = None,
+    registered_context: str | None = None,
 ) -> Tool:
-    name = _tool_name(node)
+    name = _tool_name(node, registered_decorator)
     description = ast.get_docstring(node) or ""
     parameters = [_parameter(arg, node) for arg in node.args.args if arg.arg not in {"self", "cls"}]
-    analyzer = FunctionAnalyzer(file_path, source_text, parameters)
+    analyzer = FunctionAnalyzer(file_path, source_text, parameters, path_helpers or set())
     analyzer.visit(node)
     capability = Capability()
     lower_text = f"{name.lower()} {description.lower()}"
@@ -132,7 +309,7 @@ def _tool_from_function(
         capability.network_destination = analyzer.network_destination
         if analyzer.network_write:
             capability.side_effect = "external_write"
-    if _looks_external_write(lower_text):
+    if _looks_external_write(name):
         capability.side_effect = "external_write"
         analyzer.evidence.append(
             Evidence(
@@ -168,7 +345,7 @@ def _tool_from_function(
     return Tool(
         name=name,
         source=f"{file_path}:{node.lineno}",
-        context=_tool_context(context_path, node),
+        context=registered_context or _tool_context(context_path, node),
         description=description,
         parameters=parameters,
         capability=capability,
@@ -177,10 +354,17 @@ def _tool_from_function(
 
 
 class FunctionAnalyzer(ast.NodeVisitor):
-    def __init__(self, file_path: Path, source_text: str, parameters: list[Parameter]) -> None:
+    def __init__(
+        self,
+        file_path: Path,
+        source_text: str,
+        parameters: list[Parameter],
+        path_helpers: set[str],
+    ) -> None:
         self.file_path = file_path
         self.source_text = source_text
         self.parameter_names = {parameter.name for parameter in parameters}
+        self.path_helpers = path_helpers
         self.aliases: dict[str, set[str]] = {}
         self.host_guarded_parameters: set[str] = set()
         self.path_guarded_parameters: set[str] = set()
@@ -192,6 +376,7 @@ class FunctionAnalyzer(ast.NodeVisitor):
         self.network_call = False
         self.network_write = False
         self.path_guard_lines: list[int] = []
+        self.inline_path_guard_lines: list[int] = []
         self.host_guard_lines: list[int] = []
         self.filesystem_operation_lines: list[int] = []
         self.network_call_lines: list[int] = []
@@ -206,8 +391,31 @@ class FunctionAnalyzer(ast.NodeVisitor):
                 self.aliases[target.id] = roots
         self.generic_visit(node)
 
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        roots = self._parameter_roots(node.value)
+        if isinstance(node.target, ast.Name) and roots:
+            self.aliases[node.target.id] = roots
+        self.generic_visit(node)
+
+    def visit_For(self, node: ast.For) -> None:
+        roots = self._parameter_roots(node.iter)
+        if isinstance(node.target, ast.Name) and roots:
+            self.aliases[node.target.id] = roots
+        self.generic_visit(node)
+
     def visit_Call(self, node: ast.Call) -> None:
         call_name = _call_name(node.func)
+        if call_name.rsplit(".", 1)[-1] in self.path_helpers:
+            roots = set().union(*(self._parameter_roots(argument) for argument in node.args))
+            roots.update(
+                set().union(*(self._parameter_roots(keyword.value) for keyword in node.keywords))
+                if node.keywords
+                else set()
+            )
+            if roots:
+                self.path_guard_lines.append(node.lineno)
+                self.path_guarded_parameters.update(roots)
+                self._record(node, f"Tool input is constrained by approved-root helper {call_name}(...).", "filesystem_guard")
         if call_name in {"eval", "exec", "compile"}:
             self.arbitrary_code = True
             self._record(node, f"Dynamic {call_name}(...) executes model-controlled code.", "execution")
@@ -218,13 +426,43 @@ class FunctionAnalyzer(ast.NodeVisitor):
             elif call_name.startswith("subprocess.") and _has_model_controlled_executable(node, self._parameter_roots):
                 self.shell_execution = True
                 self._record(node, f"{call_name}(...) uses a model-controlled executable or interpreter payload.", "execution")
-        if call_name in {"open", "read_text", "read_bytes", "Path.open", "Path.read_text", "Path.read_bytes"} or call_name.endswith((".read_text", ".read_bytes")):
+        open_access = _file_open_access(node, call_name)
+        if open_access is not None:
+            reads, writes = open_access
+            if reads:
+                self.filesystem_read = True
+                self._record(node, "A filesystem read is reachable from this MCP tool.", "filesystem")
+            if writes:
+                self.filesystem_write = True
+                self._record(node, "A filesystem write is reachable from this MCP tool.", "filesystem")
+            self.filesystem_operation_lines.append(node.lineno)
+            self._mark_inline_path_guard(node)
+        if call_name in {"read_text", "read_bytes", "Path.read_text", "Path.read_bytes"} or call_name.endswith((".read_text", ".read_bytes")):
             self.filesystem_read = True
             self.filesystem_operation_lines.append(node.lineno)
+            self._mark_inline_path_guard(node)
             self._record(node, "A filesystem read is reachable from this MCP tool.", "filesystem")
         if call_name in {"write_text", "write_bytes", "Path.write_text", "Path.write_bytes"} or call_name.endswith((".write_text", ".write_bytes")):
             self.filesystem_write = True
             self.filesystem_operation_lines.append(node.lineno)
+            self._mark_inline_path_guard(node)
+            self._record(node, "A filesystem write is reachable from this MCP tool.", "filesystem")
+        if call_name in {
+            "os.mkdir",
+            "os.makedirs",
+            "os.remove",
+            "os.unlink",
+            "os.rename",
+            "os.replace",
+            "shutil.copy",
+            "shutil.copy2",
+            "shutil.copyfile",
+            "shutil.move",
+            "shutil.rmtree",
+        } or call_name.endswith((".mkdir", ".unlink", ".rename", ".replace")):
+            self.filesystem_write = True
+            self.filesystem_operation_lines.append(node.lineno)
+            self._mark_inline_path_guard(node)
             self._record(node, "A filesystem write is reachable from this MCP tool.", "filesystem")
         if call_name.endswith((".fetchone", ".fetchall", ".fetchmany")) or _is_select_query(node, call_name):
             self.database_read = True
@@ -264,7 +502,23 @@ class FunctionAnalyzer(ast.NodeVisitor):
 
     @property
     def path_guard(self) -> bool:
-        return _guard_precedes_operations(self.path_guard_lines, self.filesystem_operation_lines)
+        return bool(self.path_guard_lines and self.filesystem_operation_lines) and all(
+            any(guard < operation for guard in self.path_guard_lines)
+            or operation in self.inline_path_guard_lines
+            for operation in self.filesystem_operation_lines
+        )
+
+    def _mark_inline_path_guard(self, operation: ast.Call) -> None:
+        for child in ast.walk(operation):
+            if not isinstance(child, ast.Call) or child is operation:
+                continue
+            call_name = _call_name(child.func)
+            if call_name.rsplit(".", 1)[-1] not in self.path_helpers:
+                continue
+            roots = set().union(*(self._parameter_roots(argument) for argument in child.args))
+            if roots:
+                self.inline_path_guard_lines.append(operation.lineno)
+                self.path_guarded_parameters.update(roots)
 
     def _parameter_roots(self, node: ast.AST | None) -> set[str]:
         if node is None:
@@ -295,8 +549,9 @@ class FunctionAnalyzer(ast.NodeVisitor):
         )
 
 
-def _tool_name(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
-    for decorator in node.decorator_list:
+def _tool_name(node: ast.FunctionDef | ast.AsyncFunctionDef, registered_decorator: ast.Call | None = None) -> str:
+    decorators = ([registered_decorator] if registered_decorator is not None else []) + list(node.decorator_list)
+    for decorator in decorators:
         if isinstance(decorator, ast.Call):
             for keyword in decorator.keywords:
                 if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
@@ -337,6 +592,22 @@ def _keyword_is_true(node: ast.Call, name: str) -> bool:
 
 def _keyword_value(node: ast.Call, name: str) -> ast.AST | None:
     return next((keyword.value for keyword in node.keywords if keyword.arg == name), None)
+
+
+def _file_open_access(node: ast.Call, call_name: str) -> tuple[bool, bool] | None:
+    if call_name != "open" and not call_name.endswith(".open"):
+        return None
+    mode_index = 1 if call_name == "open" else 0
+    mode_node = node.args[mode_index] if len(node.args) > mode_index else _keyword_value(node, "mode")
+    if mode_node is None:
+        mode = "r"
+    elif isinstance(mode_node, ast.Constant) and isinstance(mode_node.value, str):
+        mode = mode_node.value
+    else:
+        return True, True
+    writes = any(flag in mode for flag in "wax") or "+" in mode
+    reads = "r" in mode or "+" in mode or not writes
+    return reads, writes
 
 
 def _has_model_controlled_executable(node: ast.Call, roots_for) -> bool:
@@ -397,7 +668,7 @@ def _is_host_allowlist_guard(node: ast.AST) -> bool:
 def _is_path_root_guard(node: ast.AST) -> bool:
     text = ast.unparse(node).lower()
     return (".parents" in text or "relative_to(" in text or "is_relative_to(" in text) and any(
-        token in text for token in {"root", "base", "directory", "workspace"}
+        token in text for token in {"root", "vault", "base", "directory", "workspace", "allowed"}
     )
 
 
@@ -434,7 +705,10 @@ def _highest_sensitivity(data_classes: set[str]) -> str:
 
 
 def _looks_external_write(text: str) -> bool:
-    return bool(_semantic_tokens(text) & {"send", "email", "slack", "webhook", "publish", "post", "message"})
+    return bool(
+        _semantic_tokens(text)
+        & {"send", "email", "slack", "webhook", "publish", "post", "message", "notify", "upload"}
+    )
 
 
 def _looks_destructive(text: str) -> bool:

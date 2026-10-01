@@ -16,3 +16,5 @@ MCP004, MCP007, and MCP010 also have paired approved/bounded and unapproved/unbo
 `postgresql_read_only` protects the semantic classifier from matching `post` inside `PostgreSQL`; `sql_destructive` proves that actual `DELETE`/`DROP` semantics still produce MCP004 and MCP010 with relevant evidence.
 
 Discovery is separately benchmarked by `fastmcp_async_annotations`, which must find both plain async `@mcp.tool()` and `@mcp.tool(annotations=ToolAnnotations(...))` decorators. Missing targets, unreadable trees, parse failures, and unexpected zero-tool scans fail closed.
+
+Real-world regression fixtures also cover imported `mcp.tool()(function)` registration, helper-based path containment, SQLite reads, local file modes, and local directory creation. MCP005 requires an actual outbound network destination; local writes and semantic-only action names cannot become exfiltration sinks.
