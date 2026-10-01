@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from mcp_audit.diff.models import SecurityChange
+from mcp_audit.diff.models import ChangeKind, SecurityChange
 from mcp_audit.models.report import SecurityDiff
 
 
 def render_diff_markdown(report: SecurityDiff) -> str:
-    result = "Security regression detected" if report.blocking_regressions else "No security regression"
+    if report.blocking_regressions:
+        result = "❌ Security regression detected"
+    elif report.warnings:
+        result = "⚠️ No blocking security regression"
+    else:
+        result = "✅ No security regression"
     lines = [
         "## MCP Audit",
         "",
@@ -33,26 +38,40 @@ def render_diff_markdown(report: SecurityDiff) -> str:
         )
         lines.append("")
     if report.improvements:
-        lines.extend(["### Improvements", ""])
-        lines.extend(f"- {_change_description(change)}" for change in report.improvements)
-        lines.append("")
-    lines.append(f"**{len(report.blocking_regressions)} blocking regressions**")
+        lines.extend(
+            [
+                "### Improvements",
+                "",
+                "| Tool | Change | Before | After | Policy |",
+                "|---|---|---|---|---|",
+                *[
+                    _change_row(change, _improvement_policy(change))
+                    for change in report.improvements
+                ],
+                "",
+            ]
+        )
+    blocking_count = len(report.blocking_regressions)
+    if blocking_count:
+        noun = "regression" if blocking_count == 1 else "regressions"
+        lines.append(f"**❌ {blocking_count} blocking {noun}**")
+    else:
+        lines.append("**✅ 0 blocking regressions**")
     return "\n".join(lines) + "\n"
 
 
-def _change_row(change: SecurityChange) -> str:
-    policy = "BLOCK" if change.blocking else "WARN"
+def _change_row(change: SecurityChange, policy: str | None = None) -> str:
+    policy = policy or ("BLOCK" if change.blocking else "WARN")
     return (
         f"| `{_escape(change.tool)}` | {_escape(_change_label(change))} | "
         f"`{_escape(_value(change.before))}` | `{_escape(_value(change.after))}` | {policy} |"
     )
 
 
-def _change_description(change: SecurityChange) -> str:
-    return (
-        f"`{change.tool}`: {_change_label(change)} "
-        f"`{_value(change.before)}` -> `{_value(change.after)}`"
-    )
+def _improvement_policy(change: SecurityChange) -> str:
+    if change.kind == ChangeKind.FINDING_REMOVED:
+        return "RESOLVED"
+    return "IMPROVED"
 
 
 def _change_label(change: SecurityChange) -> str:

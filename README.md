@@ -4,18 +4,25 @@
 
 MCP Audit tells you when a pull request makes an MCP server more dangerous.
 
-```text
-PR changes:
+**MCP Audit understands whether a change makes your MCP server safer, riskier, or simply different.**
 
-filesystem:
-allowlisted_files -> unrestricted
+**Blocking regression detected**
 
-approval:
-required -> removed
+Filesystem scope widened from allowlisted to unrestricted.
 
-MCP Audit:
-X Security regression detected
-```
+![MCP Audit blocking an unrestricted filesystem regression](docs/assets/demo/blocking-regression.png)
+
+**No security regression**
+
+A new read-only tool was added; MCP Audit warns but does not block.
+
+![MCP Audit allowing a harmless read-only tool](docs/assets/demo/harmless-tool-added.png)
+
+**Security improvement**
+
+Filesystem access was narrowed and previous findings were resolved.
+
+![MCP Audit reporting resolved filesystem findings](docs/assets/demo/security-improvement.png)
 
 Add it to a pull-request workflow:
 

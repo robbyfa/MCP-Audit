@@ -184,10 +184,38 @@ def test_markdown_and_sarif_share_the_structured_diff() -> None:
     report = build_diff("baseline", _report(_tool()), _report(_tool(network="unrestricted_outbound"), _finding(Severity.HIGH)))
     apply_policy(report, Policy())
     markdown = render_diff_markdown(report)
-    assert "Security regression detected" in markdown
+    assert "❌ Security regression detected" in markdown
     assert "| `example` | network | `none` | `unrestricted_outbound` | BLOCK |" in markdown
+    assert "**❌ 2 blocking regressions**" in markdown
     sarif = json.loads(render_sarif(report))
     assert {result["ruleId"] for result in sarif["runs"][0]["results"]} == {"MCP003"}
+
+
+def test_markdown_distinguishes_warning_only_changes() -> None:
+    report = build_diff("baseline", _report(), _report(_tool()))
+    apply_policy(report, Policy())
+
+    markdown = render_diff_markdown(report)
+
+    assert "⚠️ No blocking security regression" in markdown
+    assert "| `example` | tool added | `none` | `none` | WARN |" in markdown
+    assert "**✅ 0 blocking regressions**" in markdown
+
+
+def test_markdown_renders_improvements_as_a_table() -> None:
+    report = build_diff(
+        "baseline",
+        _report(_tool(filesystem="unrestricted"), _finding(Severity.HIGH)),
+        _report(_tool(filesystem="allowlisted_files")),
+    )
+    apply_policy(report, Policy())
+
+    markdown = render_diff_markdown(report)
+
+    assert "✅ No security regression" in markdown
+    assert "### Improvements" in markdown
+    assert "| `example` | filesystem | `unrestricted` | `allowlisted_files` | IMPROVED |" in markdown
+    assert "| `example` | MCP003 finding removed | `high` | `none` | RESOLVED |" in markdown
 
 
 BASE_SERVER = """\
