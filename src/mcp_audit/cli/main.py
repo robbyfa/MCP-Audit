@@ -21,14 +21,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "scan":
-            report = scan_path(args.target)
+            report = scan_path(args.target, require_tools=not args.allow_empty)
             policy = load_policy(args.policy)
             fail_on = Severity.parse(args.fail_on) if args.fail_on else None
             report = apply_policy(report, policy, fail_on)
             _write(_render(report, args.format), args.output)
             return 1 if report.result == "fail" else 0
         if args.command == "manifest":
-            report = scan_path(args.target)
+            report = scan_path(args.target, require_tools=True)
             _write(render_manifest(report), args.output)
             return 0
         if args.command == "diff":
@@ -65,6 +65,11 @@ def _parser() -> argparse.ArgumentParser:
 
     scan = subcommands.add_parser("scan", help="scan local source")
     scan.add_argument("target", nargs="?", default=".")
+    scan.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="allow a successful scan when no MCP tools are discovered",
+    )
     _report_options(scan)
 
     manifest = subcommands.add_parser("manifest", help="generate a capability manifest")

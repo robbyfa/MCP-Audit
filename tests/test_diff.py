@@ -3,6 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from mcp_audit.analysis.diff import _build_diff, diff_against_base
 from mcp_audit.analysis.scan import scan_path
 from mcp_audit.reporters.terminal import render_diff_terminal
@@ -41,6 +43,8 @@ def delete_customer(customer_id: str) -> str:
 '''
 
 UNAPPROVED_SERVER = APPROVED_SERVER.replace("@mcp.tool(requires_approval=True)", "@mcp.tool()")
+
+EMPTY_SERVER = "from fastmcp import FastMCP\nmcp = FastMCP('empty')\n"
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -142,3 +146,31 @@ def test_new_high_impact_tool_is_capability_escalation(tmp_path: Path) -> None:
     report = _build_diff("baseline", scan_path(baseline), scan_path(head))
     assert report.new_tools == ["fetch_status"]
     assert "MCP016" in {finding.rule_id for finding in report.findings}
+
+
+def test_diff_allows_intentional_tool_removal(tmp_path: Path) -> None:
+    server = tmp_path / "server.py"
+    server.write_text(BASE_SERVER, encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "tests@example.com")
+    _git(tmp_path, "config", "user.name", "MCP Audit Tests")
+    _git(tmp_path, "add", "server.py")
+    _git(tmp_path, "commit", "-m", "tool baseline")
+    server.write_text(EMPTY_SERVER, encoding="utf-8")
+
+    report = diff_against_base("HEAD", tmp_path)
+    assert report.removed_tools == ["fetch_status"]
+    assert report.risk_after == 0
+
+
+def test_diff_rejects_zero_tools_in_both_revisions(tmp_path: Path) -> None:
+    server = tmp_path / "server.py"
+    server.write_text(EMPTY_SERVER, encoding="utf-8")
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "tests@example.com")
+    _git(tmp_path, "config", "user.name", "MCP Audit Tests")
+    _git(tmp_path, "add", "server.py")
+    _git(tmp_path, "commit", "-m", "empty baseline")
+
+    with pytest.raises(ValueError, match="no MCP tools discovered in either"):
+        diff_against_base("HEAD", tmp_path)

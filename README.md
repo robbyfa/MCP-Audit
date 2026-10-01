@@ -31,6 +31,8 @@ After the package is published to PyPI, the installation command becomes `pipx i
 uv run mcp-audit scan .
 ```
 
+Scans fail closed when source cannot be read or when no MCP tools are discovered. Use `--allow-empty` only when an empty result is intentional.
+
 Useful output formats:
 
 ```bash

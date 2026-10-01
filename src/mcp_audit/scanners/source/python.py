@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import re
 from pathlib import Path
 
@@ -26,21 +27,50 @@ NETWORK_WRITES = {
 
 
 def scan_python_sources(root: Path) -> list[Tool]:
-    files = [root] if root.is_file() and root.suffix == ".py" else sorted(root.rglob("*.py"))
+    files = _python_files(root)
     tools: list[Tool] = []
     for file_path in files:
-        if any(part in {".git", ".venv", "venv", "__pycache__"} for part in file_path.parts):
-            continue
         try:
             source_text = file_path.read_text(encoding="utf-8")
             tree = ast.parse(source_text, filename=str(file_path))
-        except (SyntaxError, UnicodeDecodeError):
-            continue
+        except SyntaxError as exc:
+            raise ValueError(f"cannot parse Python source {file_path}:{exc.lineno}: {exc.msg}") from exc
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"Python source is not UTF-8: {file_path}") from exc
+        except OSError as exc:
+            raise OSError(exc.errno, f"cannot read Python source {file_path}: {exc.strerror}", str(file_path)) from exc
         context_path = file_path.name if root.is_file() else str(file_path.relative_to(root))
         visitor = FastMCPVisitor(file_path, source_text, context_path)
         visitor.visit(tree)
         tools.extend(visitor.tools)
     return tools
+
+
+def _python_files(root: Path) -> list[Path]:
+    try:
+        root.stat()
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"scan target does not exist: {root}") from exc
+    except OSError as exc:
+        raise OSError(exc.errno, f"cannot access scan target {root}: {exc.strerror}", str(root)) from exc
+
+    if root.is_file():
+        if root.suffix != ".py":
+            raise ValueError(f"scan target is not a Python file: {root}")
+        return [root]
+    if not root.is_dir():
+        raise ValueError(f"scan target is not a file or directory: {root}")
+
+    files: list[Path] = []
+
+    def raise_walk_error(error: OSError) -> None:
+        raise OSError(error.errno, f"cannot traverse scan target: {error.strerror}", error.filename) from error
+
+    for directory, dirnames, filenames in os.walk(root, onerror=raise_walk_error):
+        dirnames[:] = [name for name in dirnames if name not in {".git", ".venv", "venv", "__pycache__"}]
+        base = Path(directory)
+        files.extend(base / name for name in filenames if name.endswith(".py"))
+    return sorted(files)
 
 
 class FastMCPVisitor(ast.NodeVisitor):

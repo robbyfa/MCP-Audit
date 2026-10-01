@@ -19,7 +19,16 @@ def diff_against_base(base: str, target: str | Path = ".") -> SecurityDiff:
         base_root = Path(temp_dir) / "base"
         _export_git_tree(base, base_root, repo_root)
         base_target = base_root / relative_target
-        base_report = scan_path(base_target if base_target.exists() else base_root)
+        base_report = (
+            scan_path(base_target)
+            if base_target.exists()
+            else ScanReport(target=str(base_target), server_name=head.server_name)
+        )
+    if not head.tools and not base_report.tools:
+        raise ValueError(
+            f"no MCP tools discovered in either {target_path} or baseline {base}; "
+            "check the target path, filesystem access, and supported decorators"
+        )
     return _build_diff(base, base_report, head)
 
 

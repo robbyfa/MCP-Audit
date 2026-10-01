@@ -7,9 +7,13 @@ from mcp_audit.rules.engine import evaluate_tools
 from mcp_audit.scanners.source.python import scan_python_sources
 
 
-def scan_path(path: str | Path) -> ScanReport:
+def scan_path(path: str | Path, *, require_tools: bool = False) -> ScanReport:
     target = Path(path).resolve()
     tools = scan_python_sources(target)
+    if require_tools and not tools:
+        raise ValueError(
+            f"no MCP tools discovered in {target}; check the target path, filesystem access, and supported decorators"
+        )
     findings = evaluate_tools(tools)
     return ScanReport(
         target=str(target),
