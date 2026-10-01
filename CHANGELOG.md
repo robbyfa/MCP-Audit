@@ -4,6 +4,8 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-01
+
 ### Added
 
 - Dedicated PyPI Trusted Publishing workflow with tag-pinned builds and OIDC authentication.
