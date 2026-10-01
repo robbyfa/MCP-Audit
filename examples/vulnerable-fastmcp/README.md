@@ -17,4 +17,4 @@ To turn one scenario into a local demo repository, copy `before.py` to `server.p
 mcp-audit diff --baseline HEAD .
 ```
 
-The included workflow uses the v0.2.1 Action and writes both SARIF annotations and a Markdown job summary.
+The included workflow uses the v0.2.2 Action and writes both SARIF annotations and a Markdown job summary.

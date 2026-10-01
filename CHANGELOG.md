@@ -4,6 +4,17 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-01
+
+### Changed
+
+- Use a consistent warning marker for both the warning-only summary headline and its zero-blocker footer.
+- Label the current side as `PR changes` in GitHub Action summaries while retaining `WORKTREE` in local CLI output.
+
+### Verified
+
+- 91 automated tests, including the GitHub-specific current label and warning-only footer contract.
+
 ## [0.2.1] - 2026-10-01
 
 ### Changed

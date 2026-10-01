@@ -4,7 +4,7 @@ MCP Audit maintains five independent versions:
 
 | Contract | Current | Change policy |
 | --- | --- | --- |
-| CLI/package | `0.2.1` | Semantic versioning; pre-1.0 minor releases may change CLI behavior |
+| CLI/package | `0.2.2` | Semantic versioning; pre-1.0 minor releases may change CLI behavior |
 | Ruleset | `0.2` | Minor adds, retires, or materially changes rules; patch corrects implementation without intended semantic change |
 | JSON report schema | `1.0` | Minor changes are additive; major changes may remove fields or change meaning |
 | Security diff schema | `1.0` | Minor changes are additive; major changes may remove fields or change classification meaning |
