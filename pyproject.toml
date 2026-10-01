@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mcp-audit"
+name = "mcp-capdiff"
 dynamic = ["version"]
 description = "Security regression scanner for Model Context Protocol servers."
 readme = "README.md"

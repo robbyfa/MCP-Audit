@@ -21,7 +21,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mcp-audit"
+name = "mcp-capdiff"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

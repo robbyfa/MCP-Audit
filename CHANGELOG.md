@@ -8,6 +8,11 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 - Dedicated PyPI Trusted Publishing workflow with tag-pinned builds and OIDC authentication.
 
+### Changed
+
+- Rename the PyPI distribution to `mcp-capdiff` while preserving the MCP Audit product name, `mcp_audit` import package, and `mcp-audit` command.
+- Prepare version `0.1.1` so the public `v0.1.0` tag remains immutable.
+
 ## [0.1.0] - 2026-10-01
 
 ### Fixed

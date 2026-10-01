@@ -23,7 +23,12 @@ mcp-audit --version
 mcp-audit scan .
 ```
 
-After the package is published to PyPI, the installation command becomes `pipx install mcp-audit`.
+The product and CLI are named MCP Audit, while the PyPI distribution is named `mcp-capdiff`:
+
+```bash
+pipx install mcp-capdiff
+mcp-audit --version
+```
 
 ## Scan a server
 
