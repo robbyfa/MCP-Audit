@@ -54,7 +54,7 @@ runs:
         MCP_AUDIT_SUMMARY: ${{ inputs.summary }}
       run: |
         set +e
-        args=(diff --baseline "$MCP_AUDIT_BASELINE" "$MCP_AUDIT_PATH" --sarif-output "$MCP_AUDIT_SARIF" --summary-output "$MCP_AUDIT_SUMMARY")
+        args=(diff --baseline "$MCP_AUDIT_BASELINE" "$MCP_AUDIT_PATH" --sarif-output "$MCP_AUDIT_SARIF" --summary-output "$MCP_AUDIT_SUMMARY" --summary-current-label "PR changes")
         if [[ -n "$MCP_AUDIT_POLICY" ]]; then
           args+=(--policy "$MCP_AUDIT_POLICY")
         fi

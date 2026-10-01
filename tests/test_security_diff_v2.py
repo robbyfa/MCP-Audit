@@ -195,11 +195,12 @@ def test_markdown_distinguishes_warning_only_changes() -> None:
     report = build_diff("baseline", _report(), _report(_tool()))
     apply_policy(report, Policy())
 
-    markdown = render_diff_markdown(report)
+    markdown = render_diff_markdown(report, current_label="PR changes")
 
     assert "⚠️ No blocking security regression" in markdown
+    assert "Current: `PR changes`" in markdown
     assert "| `example` | tool added | `none` | `none` | WARN |" in markdown
-    assert "**✅ 0 blocking regressions**" in markdown
+    assert "**⚠️ 0 blocking regressions**" in markdown
 
 
 def test_markdown_renders_improvements_as_a_table() -> None:

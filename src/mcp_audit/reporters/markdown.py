@@ -4,7 +4,7 @@ from mcp_audit.diff.models import ChangeKind, SecurityChange
 from mcp_audit.models.report import SecurityDiff
 
 
-def render_diff_markdown(report: SecurityDiff) -> str:
+def render_diff_markdown(report: SecurityDiff, *, current_label: str | None = None) -> str:
     if report.blocking_regressions:
         result = "❌ Security regression detected"
     elif report.warnings:
@@ -17,7 +17,7 @@ def render_diff_markdown(report: SecurityDiff) -> str:
         f"**{result}**",
         "",
         f"Baseline: `{report.base}`  ",
-        f"Current: `{report.current}`",
+        f"Current: `{current_label or report.current}`",
         "",
     ]
     notable = [*report.blocking_regressions, *report.warnings]
@@ -55,6 +55,8 @@ def render_diff_markdown(report: SecurityDiff) -> str:
     if blocking_count:
         noun = "regression" if blocking_count == 1 else "regressions"
         lines.append(f"**❌ {blocking_count} blocking {noun}**")
+    elif report.warnings:
+        lines.append("**⚠️ 0 blocking regressions**")
     else:
         lines.append("**✅ 0 blocking regressions**")
     return "\n".join(lines) + "\n"

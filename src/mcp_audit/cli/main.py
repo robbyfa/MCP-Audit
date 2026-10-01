@@ -41,7 +41,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.sarif_output:
                 _write(render_sarif(report), args.sarif_output)
             if args.summary_output:
-                _write(render_diff_markdown(report), args.summary_output)
+                _write(
+                    render_diff_markdown(report, current_label=args.summary_current_label),
+                    args.summary_output,
+                )
             return 1 if report.result == "fail" else 0
         if args.command == "policy" and args.policy_command == "check":
             policy = load_policy(args.policy)
@@ -87,6 +90,10 @@ def _parser() -> argparse.ArgumentParser:
     diff.add_argument("--current", help="optional current Git revision; defaults to the working tree")
     diff.add_argument("--sarif-output", help="write newly introduced findings as SARIF")
     diff.add_argument("--summary-output", help="write a Markdown CI summary")
+    diff.add_argument(
+        "--summary-current-label",
+        help="display label for the current revision in the Markdown summary",
+    )
     _report_options(diff, formats=["terminal", "json", "sarif", "markdown"])
 
     policy = subcommands.add_parser("policy", help="policy utilities")
