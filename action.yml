@@ -29,6 +29,10 @@ inputs:
     description: Markdown job-summary output path.
     required: false
     default: "mcp-audit-summary.md"
+  job-summary:
+    description: Append the Markdown report to the GitHub Actions job summary.
+    required: false
+    default: "true"
 outputs:
   exit-code:
     description: MCP Audit exit code (0 pass, 1 security regression, 2 operational error).
@@ -62,7 +66,7 @@ runs:
         fi
         exit 0
     - name: Add security diff summary
-      if: always() && steps.audit.outputs.exit-code != '2'
+      if: always() && inputs.job-summary == 'true' && steps.audit.outputs.exit-code != '2'
       shell: bash
       env:
         MCP_AUDIT_SUMMARY: ${{ inputs.summary }}

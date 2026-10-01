@@ -32,6 +32,7 @@ jobs:
         with:
           path: fixtures/safe_server
           baseline: HEAD
+          job-summary: "false"
 
   dogfood:
     if: github.event_name == 'pull_request'
