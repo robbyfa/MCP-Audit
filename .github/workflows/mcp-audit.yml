@@ -35,7 +35,7 @@ jobs:
           job-summary: "false"
 
   security-diff:
-    name: Security regression check
+    name: MCP Security Regression Check
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
