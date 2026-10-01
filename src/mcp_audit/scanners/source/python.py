@@ -318,7 +318,7 @@ def _tool_from_function(
                 location=_function_location(file_path, node),
             )
         )
-    if _looks_destructive(lower_text):
+    if _looks_destructive(name, description):
         capability.destructive = True
         capability.side_effect = "destructive_action"
         analyzer.evidence.append(
@@ -364,6 +364,11 @@ class FunctionAnalyzer(ast.NodeVisitor):
         self.file_path = file_path
         self.source_text = source_text
         self.parameter_names = {parameter.name for parameter in parameters}
+        self.path_objects = {
+            parameter.name
+            for parameter in parameters
+            if parameter.annotation and parameter.annotation.rsplit(".", 1)[-1] == "Path"
+        }
         self.path_helpers = path_helpers
         self.aliases: dict[str, set[str]] = {}
         self.host_guarded_parameters: set[str] = set()
@@ -387,14 +392,21 @@ class FunctionAnalyzer(ast.NodeVisitor):
     def visit_Assign(self, node: ast.Assign) -> None:
         roots = self._parameter_roots(node.value)
         for target in node.targets:
-            if isinstance(target, ast.Name) and roots:
-                self.aliases[target.id] = roots
+            if isinstance(target, ast.Name):
+                if roots:
+                    self.aliases[target.id] = roots
+                if _is_path_expression(node.value, self.path_objects):
+                    self.path_objects.add(target.id)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         roots = self._parameter_roots(node.value)
-        if isinstance(node.target, ast.Name) and roots:
-            self.aliases[node.target.id] = roots
+        if isinstance(node.target, ast.Name):
+            if roots:
+                self.aliases[node.target.id] = roots
+            annotation = ast.unparse(node.annotation).rsplit(".", 1)[-1]
+            if annotation == "Path" or _is_path_expression(node.value, self.path_objects):
+                self.path_objects.add(node.target.id)
         self.generic_visit(node)
 
     def visit_For(self, node: ast.For) -> None:
@@ -426,6 +438,11 @@ class FunctionAnalyzer(ast.NodeVisitor):
             elif call_name.startswith("subprocess.") and _has_model_controlled_executable(node, self._parameter_roots):
                 self.shell_execution = True
                 self._record(node, f"{call_name}(...) uses a model-controlled executable or interpreter payload.", "execution")
+        if call_name in {"pexpect.spawn", "pexpect.spawnu"} and _has_model_controlled_executable(
+            node, self._parameter_roots
+        ):
+            self.shell_execution = True
+            self._record(node, f"{call_name}(...) starts a model-controlled interactive process.", "execution")
         open_access = _file_open_access(node, call_name)
         if open_access is not None:
             reads, writes = open_access
@@ -459,7 +476,9 @@ class FunctionAnalyzer(ast.NodeVisitor):
             "shutil.copyfile",
             "shutil.move",
             "shutil.rmtree",
-        } or call_name.endswith((".mkdir", ".unlink", ".rename", ".replace")):
+        } or call_name.endswith((".mkdir", ".unlink", ".rename")) or _is_path_replace(
+            node, call_name, self.path_objects
+        ):
             self.filesystem_write = True
             self.filesystem_operation_lines.append(node.lineno)
             self._mark_inline_path_guard(node)
@@ -610,6 +629,37 @@ def _file_open_access(node: ast.Call, call_name: str) -> tuple[bool, bool] | Non
     return reads, writes
 
 
+def _is_path_expression(node: ast.AST | None, path_objects: set[str]) -> bool:
+    if node is None:
+        return False
+    if isinstance(node, ast.Name):
+        return node.id in path_objects
+    if isinstance(node, ast.Call):
+        call_name = _call_name(node.func)
+        if call_name in {"Path", "pathlib.Path"}:
+            return True
+        if isinstance(node.func, ast.Attribute) and node.func.attr in {
+            "absolute",
+            "expanduser",
+            "resolve",
+            "with_name",
+            "with_stem",
+            "with_suffix",
+        }:
+            return _is_path_expression(node.func.value, path_objects)
+    return False
+
+
+def _is_path_replace(node: ast.Call, call_name: str, path_objects: set[str]) -> bool:
+    if call_name in {"os.replace", "Path.replace", "pathlib.Path.replace"}:
+        return True
+    return (
+        isinstance(node.func, ast.Attribute)
+        and node.func.attr == "replace"
+        and _is_path_expression(node.func.value, path_objects)
+    )
+
+
 def _has_model_controlled_executable(node: ast.Call, roots_for) -> bool:
     if not node.args:
         return False
@@ -694,7 +744,11 @@ def _function_location(file_path: Path, node: ast.FunctionDef | ast.AsyncFunctio
 
 
 def _semantic_tokens(text: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9]+", text.lower()))
+    return set(_semantic_words(text))
+
+
+def _semantic_words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
 
 
 def _highest_sensitivity(data_classes: set[str]) -> str:
@@ -705,11 +759,34 @@ def _highest_sensitivity(data_classes: set[str]) -> str:
 
 
 def _looks_external_write(text: str) -> bool:
-    return bool(
-        _semantic_tokens(text)
-        & {"send", "email", "slack", "webhook", "publish", "post", "message", "notify", "upload"}
+    words = _semantic_words(text)
+    if words and words[0] in {"get", "list", "read", "search", "show", "monitor"}:
+        return False
+    return bool(set(words) & {"send", "forward", "publish", "post", "notify", "upload"})
+
+
+def _looks_destructive(name: str, description: str) -> bool:
+    name_words = _semantic_words(name)
+    name_tokens = set(name_words)
+    if name_words and name_words[0] in {"get", "list", "read", "search", "show", "monitor"}:
+        return False
+    destructive = {"delete", "drop", "remove", "revoke", "terminate", "destroy"}
+    if name_tokens & destructive:
+        return True
+    normalized_description = " ".join(description.lower().split())
+    if any(
+        phrase in normalized_description
+        for phrase in {"does not execute", "doesn't execute", "read-only", "strictly prohibited", "monitor only"}
+    ):
+        return False
+    declares_destructive_action = bool(
+        re.match(
+            r"^(?:this tool\s+)?(?:delete|deletes|drop|drops|remove|removes|revoke|revokes|terminate|terminates|destroy|destroys)\b",
+            normalized_description,
+        )
     )
-
-
-def _looks_destructive(text: str) -> bool:
-    return bool(_semantic_tokens(text) & {"delete", "drop", "remove", "revoke", "terminate", "destroy"})
+    execution_tool_describes_destructive_sql = bool(
+        name_tokens & {"execute", "run", "apply"}
+        and _semantic_tokens(normalized_description) & destructive
+    )
+    return declares_destructive_action or execution_tool_describes_destructive_sql

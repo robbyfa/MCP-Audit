@@ -4,6 +4,23 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-01
+
+### Fixed
+
+- Stop ordinary string, datetime, and other object `.replace()` calls from being classified as filesystem writes; retain detection for `os.replace(...)` and statically known `Path.replace(...)` calls.
+- Detect model-controlled interactive process execution through `pexpect.spawn(...)` and `pexpect.spawnu(...)`.
+- Require action verbs for semantic external-write inference so nouns such as `email` and `message` do not turn list/read tools into writes.
+- Prefer read-only tool names and explicit negation over incidental destructive words in descriptions while retaining destructive SQL detection for execution tools.
+
+### Verified
+
+- 71 automated tests, including positive controls for shell execution, filesystem replacement, destructive actions, and external writes.
+- `metabase-mcp` and `mcp_agent_mail`: string and datetime replacement no longer produce MCP002 findings.
+- `interactive-terminal-mcp`: `spawn_process` is classified as shell execution and produces MCP001 evidence at `pexpect.spawn(...)`.
+- `MCP-PostgreSQL-Ops` and `winremote-mcp`: the read-only statistics tool and GUI `Type` tool no longer produce MCP004/MCP010 findings.
+- The 14-repository benchmark covered 888 discovered tools; interprocedural network propagation remains deferred for a later release.
+
 ## [0.1.2] - 2026-10-01
 
 ### Fixed
