@@ -42,6 +42,12 @@ steps:
 
 The Action writes a security-diff summary to the workflow run, uploads new source findings to GitHub Code Scanning, and fails only when the change introduces a blocking regression.
 
+See the Action on three real pull requests:
+
+- [Filesystem access widens and CI fails](https://github.com/robbyfa/MCP-Audit/pull/1)
+- [Filesystem access narrows and CI passes](https://github.com/robbyfa/MCP-Audit/pull/2)
+- [A harmless read-only tool is added and CI passes](https://github.com/robbyfa/MCP-Audit/pull/3)
+
 ## Install the CLI
 
 ```bash
