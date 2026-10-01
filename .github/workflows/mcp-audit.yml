@@ -34,7 +34,8 @@ jobs:
           baseline: HEAD
           job-summary: "false"
 
-  dogfood:
+  security-diff:
+    name: Security regression check
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
