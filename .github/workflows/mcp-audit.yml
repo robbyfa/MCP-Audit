@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  audit:
+  test:
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -32,3 +32,22 @@ jobs:
         with:
           path: fixtures/safe_server
           baseline: HEAD
+
+  dogfood:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: robbyfa/MCP-Audit@v0.2.0
+        with:
+          path: examples/vulnerable-fastmcp
+          baseline: origin/main

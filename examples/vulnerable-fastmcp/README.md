@@ -2,6 +2,8 @@
 
 This directory is a copyable sample repository for demonstrating MCP Audit in pull requests. Each scenario contains a reviewed `before.py` and proposed `after.py`.
 
+`server.py` is the safe baseline used by the public regression demo. `dangerous_server.py` is intentionally unrestricted so a separate pull request can demonstrate that narrowing access is reported as an improvement rather than a failure.
+
 | Scenario | Expected diff |
 | --- | --- |
 | `unrestricted_fetch` | Network widening, MCP003, and MCP007 |

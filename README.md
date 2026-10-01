@@ -1,12 +1,59 @@
 # MCP Audit
 
-MCP Audit is an open-source security regression scanner for Model Context Protocol servers. It extracts tool capabilities and permissions, detects risky cross-tool data flows, compares security posture across Git revisions, and emits CI-friendly evidence.
+**Security regression CI for MCP servers.**
+
+MCP Audit tells you when a pull request makes an MCP server more dangerous.
+
+```text
+PR changes:
+
+filesystem:
+allowlisted_files -> unrestricted
+
+approval:
+required -> removed
+
+MCP Audit:
+X Security regression detected
+```
+
+Add it to a pull-request workflow:
+
+```yaml
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+
+  - uses: actions/setup-python@v5
+    with:
+      python-version: "3.12"
+
+  - uses: robbyfa/MCP-Audit@v0.2.0
+    with:
+      path: .
+      baseline: origin/main
+```
+
+The Action writes a security-diff summary to the workflow run, uploads new source findings to GitHub Code Scanning, and fails only when the change introduces a blocking regression.
+
+## Install the CLI
+
+```bash
+pipx install mcp-capdiff
+mcp-audit scan .
+```
+
+The product and CLI are named MCP Audit; the PyPI distribution is named `mcp-capdiff`.
 
 Version 0.2 focuses on Python/FastMCP projects and one CI question: did this change make the MCP server more dangerous?
 
-MCP005 is the capability-graph rule: it identifies when one tool returns classified data and another tool in the same MCP registration context can send it to an external destination. Findings include the source, data classification, sink, destination, path, source evidence, impact, and remediation.
-
-## Install locally
+## Develop locally
 
 ```bash
 uv sync
@@ -21,13 +68,6 @@ The package also supports isolated CLI installation directly from a checkout:
 pipx install .
 mcp-audit --version
 mcp-audit scan .
-```
-
-The product and CLI are named MCP Audit, while the PyPI distribution is named `mcp-capdiff`:
-
-```bash
-pipx install mcp-capdiff
-mcp-audit --version
 ```
 
 ## Scan a server
@@ -78,7 +118,7 @@ uv run pytest
 
 The corpus contains positive, negative, and edge cases under `fixtures/`, including host allowlisting, path-root validation, approval gating, and cross-tool sensitive-data paths.
 
-## GitHub Action
+## GitHub Action options
 
 The repository includes a composite action that runs the security diff, uploads SARIF to GitHub Code Scanning, and fails the check when policy thresholds are crossed:
 
@@ -95,12 +135,13 @@ steps:
   - uses: actions/setup-python@v5
     with:
       python-version: "3.12"
-  - uses: your-org/mcp-audit@v0.1
+  - uses: robbyfa/MCP-Audit@v0.2.0
     with:
       path: .
       baseline: origin/main
-      policy: mcp-audit.yaml
 ```
+
+Add `policy: mcp-audit.yaml` when the repository needs custom blocking rules or reviewed suppressions.
 
 JSON reports and manifests use the versioned schema documented in `docs/report-schema.md`.
 
@@ -117,6 +158,8 @@ The copyable [vulnerable FastMCP demo](examples/vulnerable-fastmcp/) includes fo
 - `MCP010` destructive tool exposed.
 
 Capability widening and approval removal are first-class semantic diff changes in v0.2 rather than synthetic source findings. SARIF therefore remains focused on newly introduced MCP001-MCP010 findings, while the job summary reports capability and policy changes.
+
+MCP005 is the capability-graph rule: it identifies when one tool returns classified data and another tool in the same MCP registration context can send it to an external destination. Findings include the source, data classification, sink, destination, path, source evidence, impact, and remediation.
 
 Each rule's detection behavior, examples, remediation, and limitations are documented in [docs/rules](docs/rules/README.md).
 
