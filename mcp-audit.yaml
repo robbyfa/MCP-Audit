@@ -9,6 +9,21 @@ policy:
       - critical
       - high
     max_risk_score: 60
+    fail_on_changes:
+      - new_critical_finding
+      - new_high_finding
+      - filesystem_widened
+      - network_widened
+      - shell_execution_added
+      - side_effect_widened
+      - destructive_capability_added
+      - approval_removed
+      - sensitive_external_flow_added
+    warn_on_changes:
+      - new_medium_finding
+      - tool_added
+      - sensitivity_increased
+      - input_became_unbounded
 
 suppress:
   # - rule: MCP003

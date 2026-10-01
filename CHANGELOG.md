@@ -4,6 +4,29 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-01
+
+### Added
+
+- First-class security diff model with deterministic regression, improvement, and neutral classifications.
+- Explicit capability orderings for filesystem, network, execution, side effects, sensitivity, approval, destructive behavior, and input bounds.
+- Stable tool identity based on registration context and name, plus line-independent finding identity.
+- `mcp-audit diff --baseline BASE PATH` and `mcp-audit diff BASE CURRENT` Git workflows.
+- Versioned JSON change contract, Markdown job summaries, and SARIF containing only newly introduced or severity-increased source findings.
+- Configurable semantic policy events such as `filesystem_widened`, `approval_removed`, and `new_high_finding`.
+
+### Changed
+
+- Diff exit code `1` now means a blocking security regression; operational, configuration, and baseline failures remain exit code `2`.
+- The GitHub Action now writes a concise Step Summary and uploads source-level SARIF from the same evaluated diff.
+- Capability widening and approval removal are structured changes instead of synthetic MCP016/MCP017 findings.
+- Ruleset version advances to `0.2`; scan, manifest, and security-diff schemas remain independently versioned at `1.0`.
+
+### Verified
+
+- Directionality tests cover widening and narrowing, approval and destructive changes, findings and severity changes, safe and dangerous tool additions, removals, parameter bounds, and registration contexts.
+- End-to-end Git tests cover working-tree baselines, two-revision comparisons, pass/fail/error exits, Markdown, JSON, and SARIF.
+
 ## [0.1.3] - 2026-10-01
 
 ### Fixed

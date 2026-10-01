@@ -7,6 +7,9 @@ import pytest
 
 from mcp_audit.analysis.diff import _build_diff, diff_against_base
 from mcp_audit.analysis.scan import scan_path
+from mcp_audit.diff.models import ChangeClassification, ChangeKind
+from mcp_audit.policy.evaluator import apply_policy
+from mcp_audit.policy.loader import Policy
 from mcp_audit.reporters.terminal import render_diff_terminal
 
 
@@ -62,17 +65,23 @@ def test_security_diff_focuses_on_regressions(tmp_path: Path) -> None:
     server.write_text(EXPANDED_SERVER, encoding="utf-8")
 
     report = diff_against_base("HEAD", tmp_path)
+    apply_policy(report, Policy())
 
     assert report.risk_before == 0
     assert report.risk_after > report.risk_before
     assert report.changed_tools == ["fetch_status"]
     assert any(change.capability == "network" for change in report.capability_changes)
     assert {finding.rule_id for finding in report.new_findings} >= {"MCP003", "MCP007"}
-    assert "MCP016" in {finding.rule_id for finding in report.findings}
+    assert any(
+        change.kind == ChangeKind.CAPABILITY_WIDENED
+        and change.field == "network"
+        and change.blocking
+        for change in report.changes
+    )
     output = render_diff_terminal(report)
-    assert "MCP SECURITY DIFF" in output
-    assert "Risk\n0 ->" in output
-    assert "+ MCP003 HIGH" in output
+    assert "MCP AUDIT - SECURITY DIFF" in output
+    assert "Risk: 0 ->" in output
+    assert "+ MCP003 fetch_status" in output
 
 
 def test_diff_json_uses_diff_schema(tmp_path: Path) -> None:
@@ -89,6 +98,8 @@ def test_diff_json_uses_diff_schema(tmp_path: Path) -> None:
     assert payload["schema_version"] == "1.0"
     assert payload["report_type"] == "diff"
     assert payload["summary"]["new_findings"] >= 2
+    assert payload["current"] == "WORKTREE"
+    assert payload["changes"]
 
 
 def test_diff_detects_removed_approval(tmp_path: Path) -> None:
@@ -102,8 +113,9 @@ def test_diff_detects_removed_approval(tmp_path: Path) -> None:
     server.write_text(UNAPPROVED_SERVER, encoding="utf-8")
 
     report = diff_against_base("HEAD", tmp_path)
+    apply_policy(report, Policy())
 
-    assert "MCP017" in {finding.rule_id for finding in report.findings}
+    assert any(change.kind == ChangeKind.APPROVAL_REMOVED for change in report.blocking_regressions)
     approval_change = next(change for change in report.capability_changes if change.capability == "requires_approval")
     assert approval_change.before is True
     assert approval_change.after is False
@@ -120,7 +132,7 @@ def test_diff_does_not_flag_preserved_approval(tmp_path: Path) -> None:
 
     report = diff_against_base("HEAD", tmp_path)
 
-    assert "MCP017" not in {finding.rule_id for finding in report.findings}
+    assert not any(change.kind == ChangeKind.APPROVAL_REMOVED for change in report.changes)
     assert report.changed_tools == []
 
 
@@ -130,8 +142,14 @@ def test_diff_does_not_flag_approval_added(tmp_path: Path) -> None:
     before.write_text(UNAPPROVED_SERVER, encoding="utf-8")
     after.write_text(APPROVED_SERVER, encoding="utf-8")
 
-    report = _build_diff("baseline", scan_path(before), scan_path(after))
-    assert "MCP017" not in {finding.rule_id for finding in report.findings}
+    before_report = scan_path(before)
+    after_report = scan_path(after)
+    before_report.tools[0].context = "server.py:mcp"
+    after_report.tools[0].context = "server.py:mcp"
+    report = _build_diff("baseline", before_report, after_report)
+    apply_policy(report, Policy())
+    assert not report.blocking_regressions
+    assert any(change.kind == ChangeKind.APPROVAL_ADDED for change in report.improvements)
     assert {finding.rule_id for finding in report.resolved_findings} >= {"MCP004", "MCP010"}
 
 
@@ -144,8 +162,10 @@ def test_new_high_impact_tool_is_capability_escalation(tmp_path: Path) -> None:
     (head / "server.py").write_text(EXPANDED_SERVER, encoding="utf-8")
 
     report = _build_diff("baseline", scan_path(baseline), scan_path(head))
+    apply_policy(report, Policy())
     assert report.new_tools == ["fetch_status"]
-    assert "MCP016" in {finding.rule_id for finding in report.findings}
+    assert any(change.kind == ChangeKind.TOOL_ADDED for change in report.warnings)
+    assert any(change.kind == ChangeKind.CAPABILITY_WIDENED for change in report.blocking_regressions)
 
 
 def test_diff_allows_intentional_tool_removal(tmp_path: Path) -> None:
@@ -159,8 +179,11 @@ def test_diff_allows_intentional_tool_removal(tmp_path: Path) -> None:
     server.write_text(EMPTY_SERVER, encoding="utf-8")
 
     report = diff_against_base("HEAD", tmp_path)
+    apply_policy(report, Policy())
     assert report.removed_tools == ["fetch_status"]
     assert report.risk_after == 0
+    assert report.result == "pass"
+    assert any(change.classification == ChangeClassification.IMPROVEMENT for change in report.changes)
 
 
 def test_diff_rejects_zero_tools_in_both_revisions(tmp_path: Path) -> None:

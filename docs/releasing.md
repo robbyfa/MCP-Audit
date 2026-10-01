@@ -19,7 +19,7 @@ Install the wheel into a clean environment and verify `mcp-audit --version`, a p
 
 ## Publish
 
-1. Create and push the matching Git tag, such as `v0.1.3`.
+1. Create and push the matching Git tag, such as `v0.2.0`.
 2. Publish the matching GitHub Release. This automatically runs `release.yml`.
 3. Verify `pipx install mcp-capdiff` in a clean environment.
 4. Run the tagged Action from the demo repository and confirm SARIF appears in Code Scanning.

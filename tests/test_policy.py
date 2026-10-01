@@ -7,6 +7,9 @@ import pytest
 from mcp_audit.cli.main import main
 from mcp_audit.models.finding import Evidence, Finding, Location, Severity
 from mcp_audit.models.report import ScanReport
+from mcp_audit.diff.engine import build_diff
+from mcp_audit.diff.models import ChangeKind
+from mcp_audit.models.capability import Capability, Tool
 from mcp_audit.policy.evaluator import apply_policy
 from mcp_audit.policy.loader import Policy, Suppression, _parse_small_yaml_subset
 
@@ -90,3 +93,29 @@ def test_policy_check_fails_for_expired_suppression(tmp_path) -> None:
         encoding="utf-8",
     )
     assert main(["policy", "check", str(policy_path)]) == 1
+
+
+def test_semantic_change_policy_can_warn_instead_of_block() -> None:
+    before = Tool("fetch", "server.py:1", "server.py:mcp", capability=Capability(network="none"))
+    after = Tool(
+        "fetch",
+        "server.py:1",
+        "server.py:mcp",
+        capability=Capability(network="unrestricted_outbound"),
+    )
+    report = build_diff(
+        "baseline",
+        ScanReport("before", "server", tools=[before]),
+        ScanReport("after", "server", tools=[after]),
+    )
+    policy = _parse_small_yaml_subset(
+        "policy:\n  ci:\n    fail_on_changes: [approval_removed]\n    warn_on_changes: [network_widened]\n"
+    )
+    apply_policy(report, policy)
+    assert report.result == "pass"
+    assert any(change.kind == ChangeKind.CAPABILITY_WIDENED for change in report.warnings)
+
+
+def test_unknown_semantic_change_event_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unknown change event"):
+        _parse_small_yaml_subset("policy:\n  ci:\n    fail_on_changes: [made_up_event]\n")

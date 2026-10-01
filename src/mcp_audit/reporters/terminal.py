@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from mcp_audit.models.finding import Severity
 from mcp_audit.models.report import ScanReport, SecurityDiff
+from mcp_audit.diff.models import ChangeClassification, SecurityChange
 
 
 def render_terminal(report: ScanReport) -> str:
@@ -29,48 +30,53 @@ def render_terminal(report: ScanReport) -> str:
 
 def render_diff_terminal(report: SecurityDiff) -> str:
     lines = [
-        "MCP SECURITY DIFF",
-        f"Base: {report.base}",
+        "MCP AUDIT - SECURITY DIFF",
+        f"Baseline: {report.base}",
+        f"Current:  {report.current}",
         f"Target: {report.target}",
         "",
-        "Risk",
-        f"{report.risk_before} -> {report.risk_after}",
+        "Tools",
+        *([f"+ {name}" for name in report.new_tools] or []),
+        *([f"- {name}" for name in report.removed_tools] or []),
+        *([f"~ {name}" for name in report.changed_tools] or []),
+        *(["(none)"] if not (report.new_tools or report.removed_tools or report.changed_tools) else []),
         "",
-        "New tools",
-        *([f"+ {name}" for name in report.new_tools] or ["(none)"]),
+        "Blocking regressions",
+        *([_change_line(change) for change in report.blocking_regressions] or ["(none)"]),
         "",
-        "Removed tools",
-        *([f"- {name}" for name in report.removed_tools] or ["(none)"]),
+        "Warnings",
+        *([_change_line(change) for change in report.warnings] or ["(none)"]),
         "",
-        "Changed tools",
-        *([f"~ {name}" for name in report.changed_tools] or ["(none)"]),
+        "Improvements",
+        *([_change_line(change) for change in report.improvements] or ["(none)"]),
         "",
-        "Capability changes",
-        *(
-            [f"~ {change.tool}.{change.capability}: {change.before} -> {change.after}" for change in report.capability_changes]
-            or ["(none)"]
-        ),
-        "",
-        "New findings",
-        *(
-            [f"+ {finding.rule_id} {finding.severity.name}  {finding.tool or 'n/a'}" for finding in report.new_findings]
-            or ["(none)"]
-        ),
-        "",
-        "Resolved findings",
-        *(
-            [f"- {finding.rule_id} {finding.severity.name}  {finding.tool or 'n/a'}" for finding in report.resolved_findings]
-            or ["(none)"]
-        ),
-        "",
+        f"Risk: {report.risk_before} -> {report.risk_after}",
+        f"Blocking regressions: {len(report.blocking_regressions)}",
+        f"Result: {report.result.upper()}",
     ]
-    regressions = [finding for finding in report.findings if finding.rule_id in {"MCP016", "MCP017"}]
-    if regressions:
-        lines.append("Regression details")
-        for finding in regressions:
-            lines.extend(_finding_lines(finding))
-    lines.append(f"Result: {report.result.upper()}")
     return "\n".join(lines)
+
+
+def _change_line(change: SecurityChange) -> str:
+    prefix = {
+        ChangeClassification.REGRESSION: "+",
+        ChangeClassification.IMPROVEMENT: "-",
+        ChangeClassification.NEUTRAL: "~",
+    }[change.classification]
+    subject = f"{change.rule_id} {change.tool}" if change.rule_id else change.tool
+    if change.field:
+        return f"{prefix} {subject}: {change.field} {_value(change.before)} -> {_value(change.after)}"
+    return f"{prefix} {subject}: {change.kind.value}"
+
+
+def _value(value: object) -> str:
+    if value is None:
+        return "none"
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, list):
+        return f"[{', '.join(str(item) for item in value)}]"
+    return str(value)
 
 
 def _finding_lines(finding) -> list[str]:

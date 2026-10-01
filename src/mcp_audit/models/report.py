@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from mcp_audit import REPORT_SCHEMA_VERSION, RULESET_VERSION, __version__
+from mcp_audit import DIFF_SCHEMA_VERSION, REPORT_SCHEMA_VERSION, RULESET_VERSION, __version__
+from mcp_audit.diff.models import ChangeClassification, SecurityChange
 from mcp_audit.models.capability import Tool
 from mcp_audit.models.finding import Finding, Severity
 
@@ -70,6 +71,7 @@ class CapabilityChange:
 class SecurityDiff:
     target: str
     base: str
+    current: str
     server_name: str
     risk_before: int
     risk_after: int
@@ -81,6 +83,7 @@ class SecurityDiff:
     capability_changes: list[CapabilityChange] = field(default_factory=list)
     new_findings: list[Finding] = field(default_factory=list)
     resolved_findings: list[Finding] = field(default_factory=list)
+    changes: list[SecurityChange] = field(default_factory=list)
     result: str = "pass"
 
     @property
@@ -93,13 +96,28 @@ class SecurityDiff:
             counts[finding.severity.name.lower()] += 1
         return counts
 
+    @property
+    def blocking_regressions(self) -> list[SecurityChange]:
+        return [change for change in self.changes if change.blocking]
+
+    @property
+    def warnings(self) -> list[SecurityChange]:
+        return [change for change in self.changes if change.warning and not change.blocking]
+
+    @property
+    def improvements(self) -> list[SecurityChange]:
+        return [
+            change for change in self.changes if change.classification == ChangeClassification.IMPROVEMENT
+        ]
+
     def as_dict(self) -> dict[str, object]:
         return {
-            "schema_version": REPORT_SCHEMA_VERSION,
+            "schema_version": DIFF_SCHEMA_VERSION,
             "report_type": "diff",
             "versions": {"cli": __version__, "rules": RULESET_VERSION},
             "target": self.target,
             "base": self.base,
+            "current": self.current,
             "server": {"name": self.server_name},
             "summary": {
                 "risk_before": self.risk_before,
@@ -109,7 +127,11 @@ class SecurityDiff:
                 "changed_tools": len(self.changed_tools),
                 "new_findings": len(self.new_findings),
                 "resolved_findings": len(self.resolved_findings),
+                "blocking_regressions": len(self.blocking_regressions),
+                "warnings": len(self.warnings),
+                "improvements": len(self.improvements),
             },
+            "changes": [change.as_dict() for change in self.changes],
             "new_tools": self.new_tools,
             "removed_tools": self.removed_tools,
             "changed_tools": self.changed_tools,

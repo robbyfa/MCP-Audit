@@ -8,6 +8,7 @@ from typing import Any
 import yaml
 
 from mcp_audit.models.finding import Finding, Severity
+from mcp_audit.diff.models import ChangeKind
 
 
 SUPPORTED_RULES = {
@@ -20,6 +21,22 @@ SUPPORTED_RULES = {
     "MCP010",
     "MCP016",
     "MCP017",
+}
+SUPPORTED_CHANGE_EVENTS = {
+    "new_critical_finding",
+    "new_high_finding",
+    "new_medium_finding",
+    "new_low_finding",
+    "filesystem_widened",
+    "network_widened",
+    "shell_execution_added",
+    "side_effect_widened",
+    "destructive_capability_added",
+    "approval_removed",
+    "sensitive_external_flow_added",
+    "tool_added",
+    "sensitivity_increased",
+    "input_became_unbounded",
 }
 
 
@@ -42,6 +59,8 @@ class Policy:
     fail_on: set[Severity] = field(default_factory=lambda: {Severity.CRITICAL, Severity.HIGH})
     max_risk_score: int | None = None
     suppressions: list[Suppression] = field(default_factory=list)
+    fail_on_changes: set[str] | None = None
+    warn_on_changes: set[str] | None = None
 
     def expired_suppressions(self, as_of: date | None = None) -> list[Suppression]:
         return [suppression for suppression in self.suppressions if not suppression.is_active(as_of)]
@@ -90,9 +109,27 @@ def _parse_policy(payload: Any) -> Policy:
         if not isinstance(score, int) or isinstance(score, bool) or not 0 <= score <= 100:
             raise ValueError("policy.ci.max_risk_score must be an integer from 0 to 100")
         policy.max_risk_score = score
+    if "fail_on_changes" in ci_config:
+        policy.fail_on_changes = _parse_change_kinds(ci_config["fail_on_changes"], "fail_on_changes")
+    if "warn_on_changes" in ci_config:
+        policy.warn_on_changes = _parse_change_kinds(ci_config["warn_on_changes"], "warn_on_changes")
 
     policy.suppressions = _parse_suppressions(payload.get("suppress", []))
     return policy
+
+
+def _parse_change_kinds(value: Any, field_name: str) -> set[str]:
+    if not isinstance(value, list):
+        raise ValueError(f"policy.ci.{field_name} must be a list")
+    parsed = {str(item) for item in value}
+    valid_values = SUPPORTED_CHANGE_EVENTS | {kind.value for kind in ChangeKind}
+    unknown = parsed - valid_values
+    if unknown:
+        valid = ", ".join(sorted(valid_values))
+        raise ValueError(
+            f"unknown change event in policy.ci.{field_name}: {', '.join(sorted(unknown))}; expected one of: {valid}"
+        )
+    return parsed
 
 
 def _parse_suppressions(value: Any) -> list[Suppression]:

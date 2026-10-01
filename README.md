@@ -2,7 +2,7 @@
 
 MCP Audit is an open-source security regression scanner for Model Context Protocol servers. It extracts tool capabilities and permissions, detects risky cross-tool data flows, compares security posture across Git revisions, and emits CI-friendly evidence.
 
-The first version focuses on Python/FastMCP projects and the core product thesis from the spec: show what an MCP server can do, what changed, and whether the change creates a dangerous capability path.
+Version 0.2 focuses on Python/FastMCP projects and one CI question: did this change make the MCP server more dangerous?
 
 MCP005 is the capability-graph rule: it identifies when one tool returns classified data and another tool in the same MCP registration context can send it to an external destination. Findings include the source, data classification, sink, destination, path, source evidence, impact, and remediation.
 
@@ -54,10 +54,21 @@ uv run mcp-audit manifest .
 ## Compare against a Git baseline
 
 ```bash
-uv run mcp-audit diff --base origin/main
+uv run mcp-audit diff --baseline origin/main .
+uv run mcp-audit diff origin/main HEAD
 ```
 
-The diff report focuses on security changes: before/after risk, added and changed tools, expanded capabilities, new findings, resolved findings, and approval removal.
+The diff compares tools by registration context and name, classifies capability and finding changes as regressions, improvements, or neutral changes, and exits `1` only for blocking regressions. Operational and baseline errors exit `2`.
+
+Machine and CI outputs use the same structured change model:
+
+```bash
+uv run mcp-audit diff --baseline origin/main . --format json
+uv run mcp-audit diff --baseline origin/main . --format markdown
+uv run mcp-audit diff --baseline origin/main . \
+  --sarif-output mcp-audit.sarif \
+  --summary-output mcp-audit-summary.md
+```
 
 ## Run tests
 
@@ -86,8 +97,8 @@ steps:
       python-version: "3.12"
   - uses: your-org/mcp-audit@v0.1
     with:
-      target: .
-      base: origin/main
+      path: .
+      baseline: origin/main
       policy: mcp-audit.yaml
 ```
 
@@ -95,7 +106,7 @@ JSON reports and manifests use the versioned schema documented in `docs/report-s
 
 The copyable [vulnerable FastMCP demo](examples/vulnerable-fastmcp/) includes four before/after pull-request scenarios and its own Action workflow.
 
-## V0.1 rules
+## Rules
 
 - `MCP001` arbitrary shell execution.
 - `MCP002` unrestricted filesystem access.
@@ -104,8 +115,8 @@ The copyable [vulnerable FastMCP demo](examples/vulnerable-fastmcp/) includes fo
 - `MCP005` sensitive read to external write path.
 - `MCP007` unbounded security-sensitive input.
 - `MCP010` destructive tool exposed.
-- `MCP016` capability escalation in a diff.
-- `MCP017` approval removed in a diff.
+
+Capability widening and approval removal are first-class semantic diff changes in v0.2 rather than synthetic source findings. SARIF therefore remains focused on newly introduced MCP001-MCP010 findings, while the job summary reports capability and policy changes.
 
 Each rule's detection behavior, examples, remediation, and limitations are documented in [docs/rules](docs/rules/README.md).
 
@@ -133,6 +144,16 @@ policy:
       - critical
       - high
     max_risk_score: 60
+    fail_on_changes:
+      - filesystem_widened
+      - network_widened
+      - shell_execution_added
+      - side_effect_widened
+      - approval_removed
+      - destructive_capability_added
+    warn_on_changes:
+      - tool_added
+      - input_became_unbounded
 
 suppress:
   - rule: MCP003

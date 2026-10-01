@@ -1,14 +1,22 @@
 name: MCP Audit
 description: Scan a Python/FastMCP server for security capability regressions and upload SARIF.
 inputs:
-  target:
+  path:
     description: Path to the MCP server source.
     required: false
     default: "."
-  base:
+  baseline:
     description: Git revision used as the approved security baseline.
     required: false
     default: "origin/main"
+  target:
+    description: Deprecated alias for path.
+    required: false
+    default: ""
+  base:
+    description: Deprecated alias for baseline.
+    required: false
+    default: ""
   policy:
     description: Optional MCP Audit policy file.
     required: false
@@ -17,9 +25,13 @@ inputs:
     description: SARIF output path.
     required: false
     default: "mcp-audit.sarif"
+  summary:
+    description: Markdown job-summary output path.
+    required: false
+    default: "mcp-audit-summary.md"
 outputs:
   exit-code:
-    description: MCP Audit exit code (0 pass, 1 policy failure).
+    description: MCP Audit exit code (0 pass, 1 security regression, 2 operational error).
     value: ${{ steps.audit.outputs.exit-code }}
 runs:
   using: composite
@@ -31,13 +43,14 @@ runs:
       id: audit
       shell: bash
       env:
-        MCP_AUDIT_TARGET: ${{ inputs.target }}
-        MCP_AUDIT_BASE: ${{ inputs.base }}
+        MCP_AUDIT_PATH: ${{ inputs.target || inputs.path }}
+        MCP_AUDIT_BASELINE: ${{ inputs.base || inputs.baseline }}
         MCP_AUDIT_POLICY: ${{ inputs.policy }}
         MCP_AUDIT_SARIF: ${{ inputs.sarif }}
+        MCP_AUDIT_SUMMARY: ${{ inputs.summary }}
       run: |
         set +e
-        args=(diff "$MCP_AUDIT_TARGET" --base "$MCP_AUDIT_BASE" --format sarif --output "$MCP_AUDIT_SARIF")
+        args=(diff --baseline "$MCP_AUDIT_BASELINE" "$MCP_AUDIT_PATH" --sarif-output "$MCP_AUDIT_SARIF" --summary-output "$MCP_AUDIT_SUMMARY")
         if [[ -n "$MCP_AUDIT_POLICY" ]]; then
           args+=(--policy "$MCP_AUDIT_POLICY")
         fi
@@ -48,6 +61,12 @@ runs:
           exit 2
         fi
         exit 0
+    - name: Add security diff summary
+      if: always() && steps.audit.outputs.exit-code != '2'
+      shell: bash
+      env:
+        MCP_AUDIT_SUMMARY: ${{ inputs.summary }}
+      run: cat "$MCP_AUDIT_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
     - name: Upload SARIF
       uses: github/codeql-action/upload-sarif@v4
       with:

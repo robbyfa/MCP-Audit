@@ -51,7 +51,7 @@
           "informationUri": "https://github.com/robbyfa/MCP-Audit",
           "name": "MCP Audit",
           "properties": {
-            "rulesVersion": "0.1"
+            "rulesVersion": "0.2"
           },
           "rules": [
             {
@@ -81,7 +81,7 @@
               }
             }
           ],
-          "semanticVersion": "0.1.3"
+          "semanticVersion": "0.2.0"
         }
       }
     }

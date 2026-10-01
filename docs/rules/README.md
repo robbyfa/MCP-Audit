@@ -1,6 +1,6 @@
 # MCP Audit rules
 
-Rules are versioned independently from the CLI. MCP Audit `0.1.0` ships ruleset `0.1`.
+Rules are versioned independently from the CLI. MCP Audit `0.2.0` ships ruleset `0.2`.
 
 | Rule | Default severity | Purpose |
 | --- | --- | --- |
@@ -11,7 +11,7 @@ Rules are versioned independently from the CLI. MCP Audit `0.1.0` ships ruleset 
 | [MCP005](MCP005.md) | High/Critical | Sensitive-data path to an external sink |
 | [MCP007](MCP007.md) | Medium | Unbounded security-sensitive input |
 | [MCP010](MCP010.md) | High | Destructive tool without approval |
-| [MCP016](MCP016.md) | High | Capability expansion relative to Git baseline |
-| [MCP017](MCP017.md) | High | Approval boundary removed |
+
+MCP016 and MCP017 were v0.1 synthetic diff findings. In v0.2 their semantics are represented by structured `capability_widened` and `approval_removed` changes, keeping SARIF reserved for source-level findings.
 
 Static findings are evidence for review, not proof of exploitability or legal compliance.
