@@ -12,3 +12,8 @@ def read_report(name: str) -> str:
     if resolved != REPORT_ROOT and REPORT_ROOT not in resolved.parents:
         raise ValueError("invalid report path")
     return resolved.read_text()
+
+
+@mcp.tool()
+def server_version() -> str:
+    return "1.0"
