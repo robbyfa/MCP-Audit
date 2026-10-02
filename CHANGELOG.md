@@ -4,7 +4,7 @@ All notable changes follow Keep a Changelog. Releases use semantic versioning fo
 
 ## [Unreleased]
 
-## [0.2.3] - 2026-10-01
+## [0.2.3] - 2026-10-02
 
 ### Fixed
 
